@@ -1,0 +1,1382 @@
+
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Character, Attributes, DndAttribute, Trait, StartingItem, MadnessEffect, Skill, Feat, Race, EssenceStageId, ArmorTypeForSleep, CharacterSaveData, EquipmentSlots, InventoryItem, EquipmentSlotId } from './types';
+import {
+  DND_ATTRIBUTES_KEYS, ATTRIBUTE_BASE_SCORE, INITIAL_ATTRIBUTE_BUY_POINTS,
+  INITIAL_MODIFICATION_POINTS, AVAILABLE_TRAITS, AVAILABLE_STARTING_ITEMS, 
+  AVAILABLE_MADNESS_EFFECTS, AVAILABLE_SKILLS, MAX_SKILL_PROFICIENCIES,
+  AVAILABLE_FEATS, DND_ATTRIBUTE_NAMES_RU, calculateModifier, 
+  BASE_ARMOR_CLASS, SAVING_THROW_KEYS, SAVING_THROW_NAMES_RU, AVAILABLE_RACES,
+  InfoIcon, ShieldCheckIcon, BookOpenIcon, CheckCircleIcon, XCircleIcon, TrendingUpIcon, UsersIcon,
+  ShieldExclamationIcon, parseDerivedStatValue, ListBulletIcon, StarIcon,
+  calculateProficiencyBonus, PlusIcon, MinusIcon,
+  APERTURE_GRADES, CHARACTER_RANKS, ESSENCE_STAGES, BeakerIcon, DEFAULT_HIT_DIE_TYPE, ARMOR_TYPES_FOR_SLEEP,
+  PencilSquareIcon, HeartIcon, ArmorClassIcon, BackpackIcon
+} from './constants';
+import SectionPanel from './components/SectionPanel';
+import DropdownSelect from './components/DropdownSelect';
+import AttributeEditor from './components/AttributeEditor';
+import TraitsAndItemsDisplay from './components/TraitsAndItemsDisplay';
+import CharacterSummary from './components/CharacterSummary';
+import GeminiFeature from './components/GeminiFeature';
+import ApertureDisplay from './components/ApertureDisplay'; 
+import CharacterStatusPanel from './components/CharacterStatusPanel';
+import HitDieTypeEditor from './components/HitDieTypeEditor';
+import Inventory from './components/Inventory';
+
+
+type MadnessOption = Omit<MadnessEffect, 'type'> & { type: MadnessEffect['type'] | 'none' };
+
+const calculateFinalAttributes = (baseAttributes: Attributes, race?: Race): Attributes => {
+  const finalAttributes = { ...baseAttributes };
+  if (race && race.attributeModifiers) {
+    for (const key in race.attributeModifiers) {
+      const attrKey = key as DndAttribute;
+      if (finalAttributes[attrKey] !== undefined) { 
+        finalAttributes[attrKey] += (race.attributeModifiers[attrKey] || 0);
+      }
+    }
+  }
+  return finalAttributes;
+};
+
+const getTopAttributeKeysForSkillSelection = (finalAttributes: Attributes): DndAttribute[] => {
+  const scores = DND_ATTRIBUTES_KEYS
+    .map(key => ({ key, score: finalAttributes[key] as number }))
+    .sort((a, b) => b.score - a.score);
+
+  if (scores.length === 0) return [];
+  const cutoffScore = scores[Math.min(1, scores.length - 1)].score;
+  return scores
+    .filter(s => s.score >= cutoffScore)
+    .map(s => s.key);
+};
+
+const arraysHaveSameElements = (arr1: DndAttribute[], arr2: DndAttribute[]): boolean => {
+  if (arr1.length !== arr2.length) return false;
+  const sorted1 = [...arr1].sort();
+  const sorted2 = [...arr2].sort();
+  return sorted1.every((val, index) => val === sorted2[index]);
+};
+
+
+const App = (): JSX.Element => {
+  const [characterName, setCharacterName] = useState<string>('Незнакомец');
+  const [characterLevel, setCharacterLevel] = useState<number>(1);
+  
+  const initialBaseAttributes: Attributes = DND_ATTRIBUTES_KEYS.reduce((acc, key) => {
+    acc[key] = ATTRIBUTE_BASE_SCORE;
+    return acc;
+  }, {} as Attributes);
+
+  const [baseAttributes, setBaseAttributes] = useState<Attributes>(initialBaseAttributes); 
+  const [attributeBuyPoints, setAttributeBuyPoints] = useState<number>(INITIAL_ATTRIBUTE_BUY_POINTS);
+  const [modificationPoints, setModificationPoints] = useState<number>(INITIAL_MODIFICATION_POINTS);
+  
+  const defaultRace = AVAILABLE_RACES.find(r => r.id === 'human') || (AVAILABLE_RACES.length > 0 ? AVAILABLE_RACES[0] : undefined);
+  const [selectedRace, setSelectedRace] = useState<Race | undefined>(defaultRace);
+
+  const [selectedTraits, setSelectedTraits] = useState<Trait[]>([]);
+  const [selectedItems, setSelectedItems] = useState<StartingItem[]>([]);
+  const [selectedMadness, setSelectedMadness] = useState<MadnessEffect | undefined>(undefined);
+  const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
+  const [activeFeats, setActiveFeats] = useState<Feat[]>([]); 
+  const [selectedFlawFeats, setSelectedFlawFeats] = useState<Feat[]>([]); 
+  
+  // Inventory State
+  const [equipment, setEquipment] = useState<EquipmentSlots>({});
+  const [backpack, setBackpack] = useState<InventoryItem[]>([]);
+
+  // Aperture State
+  const defaultApertureGrade = APERTURE_GRADES[1]; 
+  const [selectedApertureGradeId, setSelectedApertureGradeId] = useState<string>(defaultApertureGrade.id);
+  const [specificMaxEssence, setSpecificMaxEssence] = useState<number>(defaultApertureGrade.minMaxEssence);
+  const [selectedCharacterRankId, setSelectedCharacterRankId] = useState<string>(CHARACTER_RANKS[0].id); 
+  const [selectedEssenceStageId, setSelectedEssenceStageId] = useState<EssenceStageId>(ESSENCE_STAGES[0].id); 
+  const [currentEssencePercentage, setCurrentEssencePercentage] = useState<number>(defaultApertureGrade.minMaxEssence);
+
+  // HP, HD, Time, Rest State
+  const [maxHp, setMaxHp] = useState<number>(DEFAULT_HIT_DIE_TYPE); // Will be calculated
+  const [currentHp, setCurrentHp] = useState<number>(DEFAULT_HIT_DIE_TYPE); // Will be calculated
+  const [hitDieType, setHitDieType] = useState<number>(DEFAULT_HIT_DIE_TYPE);
+  const [maxHitDice, setMaxHitDice] = useState<number>(1); // Will be characterLevel
+  const [currentHitDice, setCurrentHitDice] = useState<number>(1); // Will be characterLevel
+  const [gameTimeHours, setGameTimeHours] = useState<number>(8); // Start at 8 AM, Day 1
+  const [lastLongRestEndTime, setLastLongRestEndTime] = useState<number>(0); 
+  const [lastExhaustionCheckTime, setLastExhaustionCheckTime] = useState<number>(0);
+  const [exhaustionLevel, setExhaustionLevel] = useState<number>(0);
+  const [armorTypeWornForSleep, setArmorTypeWornForSleep] = useState<ArmorTypeForSleep>('none');
+  const [conSavesProficiency, setConSavesProficiency] = useState<boolean>(false); // For CON saves for exhaustion
+  const [manualMaxHpModifier, setManualMaxHpModifier] = useState<number>(0);
+  const [manualAcModifier, setManualAcModifier] = useState<number>(0);
+
+
+  const [backstory, setBackstory] = useState<string | undefined>(undefined);
+  const [showSummary, setShowSummary] = useState<boolean>(false); // May be used later for a "View Summary" button
+  const [derivedStats, setDerivedStats] = useState<string[]>([]);
+  
+  const finalAttributes = useMemo(() => calculateFinalAttributes(baseAttributes, selectedRace), [baseAttributes, selectedRace]);
+  const currentProficiencyBonus = useMemo(() => calculateProficiencyBonus(characterLevel), [characterLevel]);
+  const currentApertureGrade = useMemo(() => APERTURE_GRADES.find(g => g.id === selectedApertureGradeId) || APERTURE_GRADES[0], [selectedApertureGradeId]);
+
+  const [eligibleAttributesForFirstSkills, setEligibleAttributesForFirstSkills] = useState<DndAttribute[]>(
+    getTopAttributeKeysForSkillSelection(finalAttributes) 
+  );
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+
+  const checkFeatRequirements = (feat: Feat, currentFinalAttributes: Attributes): boolean => {
+    return feat.requirements.every(req => {
+      const attrValue = currentFinalAttributes[req.attribute];
+      if (req.minValue !== undefined && attrValue < req.minValue) return false;
+      if (req.maxValue !== undefined && attrValue > req.maxValue) return false;
+      return true;
+    });
+  };
+  
+  useEffect(() => {
+    const newEligibleAttrs = getTopAttributeKeysForSkillSelection(finalAttributes);
+    if (!arraysHaveSameElements(newEligibleAttrs, eligibleAttributesForFirstSkills)) {
+      setSelectedSkills([]); 
+      setEligibleAttributesForFirstSkills(newEligibleAttrs);
+    }
+  }, [finalAttributes, eligibleAttributesForFirstSkills]);
+
+  useEffect(() => {
+    const autoActivatedBeneficial = AVAILABLE_FEATS.filter(feat => 
+      !feat.isFlaw && 
+      feat.requirements.length > 0 && 
+      checkFeatRequirements(feat, finalAttributes) 
+    );
+    const autoActivatedStatFlaws = AVAILABLE_FEATS.filter(feat =>
+        feat.isFlaw &&
+        feat.requirements.length > 0 && 
+        checkFeatRequirements(feat, finalAttributes) 
+    );
+    setActiveFeats([...autoActivatedBeneficial, ...autoActivatedStatFlaws]);
+  }, [finalAttributes]); 
+  
+  useEffect(() => {
+    let currentMP = INITIAL_MODIFICATION_POINTS;
+
+    DND_ATTRIBUTES_KEYS.forEach(attrKey => {
+      const score = baseAttributes[attrKey]; 
+      if (score < ATTRIBUTE_BASE_SCORE) {
+        currentMP += (ATTRIBUTE_BASE_SCORE - score);
+      }
+    });
+
+    selectedTraits.forEach(trait => currentMP -= trait.modificationPointCost);
+    selectedItems.forEach(item => currentMP -= item.modificationPointCost);
+    if (selectedMadness) {
+      currentMP -= selectedMadness.modificationPointAdjustment; 
+    }
+    
+    selectedFlawFeats.forEach(feat => {
+        if (feat.modificationPointAdjustment && feat.modificationPointAdjustment > 0) {
+            currentMP += feat.modificationPointAdjustment;
+        }
+    });
+
+    setModificationPoints(currentMP);
+  }, [baseAttributes, selectedTraits, selectedItems, selectedMadness, selectedFlawFeats]); 
+
+  // Sync selected items with inventory
+   useEffect(() => {
+    const targetItemIds = new Set(selectedItems.map(i => i.id));
+    const allInventoryItems = [...backpack, ...Object.values(equipment).filter(Boolean) as InventoryItem[]];
+
+    const currentItemCounts = allInventoryItems.reduce((acc, item) => {
+        acc[item.itemId] = (acc[item.itemId] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const targetItemCounts = selectedItems.reduce((acc, item) => {
+        acc[item.id] = (acc[item.id] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    let itemsChanged = false;
+    let newBackpack = [...backpack];
+    let newEquipment = { ...equipment };
+
+    // Remove items that are no longer selected
+    for (const item of allInventoryItems) {
+        if (!targetItemIds.has(item.itemId)) {
+            itemsChanged = true;
+            newBackpack = newBackpack.filter(bpItem => bpItem.instanceId !== item.instanceId);
+            for (const slot in newEquipment) {
+                if (newEquipment[slot as EquipmentSlotId]?.instanceId === item.instanceId) {
+                    newEquipment[slot as EquipmentSlotId] = null;
+                }
+            }
+        }
+    }
+
+    // Add newly selected items
+    for (const selectedItem of selectedItems) {
+        const currentCount = currentItemCounts[selectedItem.id] || 0;
+        const targetCount = targetItemCounts[selectedItem.id] || 0;
+        if (currentCount < targetCount) {
+             itemsChanged = true;
+            for (let i = 0; i < targetCount - currentCount; i++) {
+                newBackpack.push({
+                    itemId: selectedItem.id,
+                    instanceId: `item-${Date.now()}-${Math.random()}`
+                });
+            }
+        }
+    }
+    
+    if (itemsChanged) {
+        setBackpack(newBackpack);
+        setEquipment(newEquipment);
+    }
+  }, [selectedItems]);
+
+
+  // Set Hit Die Type based on Race
+  useEffect(() => {
+    if (selectedRace) {
+      if (selectedRace.id === 'rockman') {
+        setHitDieType(12);
+      } else if (selectedRace.id === 'eggman') {
+        setHitDieType(6);
+      } else {
+        setHitDieType(DEFAULT_HIT_DIE_TYPE); // Default for human and others
+      }
+    } else {
+      setHitDieType(DEFAULT_HIT_DIE_TYPE); // Fallback if no race selected
+    }
+  }, [selectedRace]);
+
+  // Calculate Max HP
+  useEffect(() => {
+    const conMod = calculateModifier(finalAttributes.constitution);
+    let calculatedMaxHp;
+
+    // HP for Level 1: Max HD roll + CON modifier
+    let levelOneHp = hitDieType + conMod;
+    levelOneHp = Math.max(1, levelOneHp); // Ensure at least 1 HP at level 1
+
+    if (characterLevel === 1) {
+        calculatedMaxHp = levelOneHp;
+    } else {
+        calculatedMaxHp = levelOneHp; // Start with L1 HP
+        // For levels 2+
+        for (let i = 2; i <= characterLevel; i++) {
+            // Average roll (rounded up via floor+1) + CON mod
+            calculatedMaxHp += (Math.floor(hitDieType / 2) + 1 + conMod); 
+        }
+    }
+    
+    const allCurrentEffectiveFeats = [
+        ...activeFeats, 
+        ...selectedFlawFeats
+    ].filter((feat, index, self) => index === self.findIndex(f => f.id === feat.id));
+
+    if (selectedTraits.find(t => t.id === 'trait_tough')) calculatedMaxHp += 2; // Flat +2 HP from "Крепкий"
+    if (allCurrentEffectiveFeats.find(f => f.id === 'feat_tough_upgrade')) calculatedMaxHp += (2 * characterLevel); // +2 HP per level from "Закаленный"
+    
+    calculatedMaxHp += manualMaxHpModifier; // Apply manual modifier
+
+    calculatedMaxHp = Math.max(characterLevel, calculatedMaxHp); // Ensure HP is at least 1 per level
+
+    setMaxHp(calculatedMaxHp);
+    setCurrentHp(prev => Math.min(prev, calculatedMaxHp)); 
+    setMaxHitDice(characterLevel);
+    setCurrentHitDice(prev => Math.min(prev, characterLevel)); 
+  }, [finalAttributes.constitution, characterLevel, hitDieType, selectedTraits, activeFeats, selectedFlawFeats, manualMaxHpModifier]);
+
+  // Update CON save proficiency based on traits/feats
+  useEffect(() => {
+    const resilientCon = selectedTraits.find(t => t.id === 'trait_resilient_con');
+    setConSavesProficiency(!!resilientCon);
+  }, [selectedTraits]);
+
+
+  const handleToggleTrait = (trait: Trait) => {
+    setSelectedTraits(prev => 
+      prev.find(t => t.id === trait.id) 
+      ? prev.filter(t => t.id !== trait.id) 
+      : [...prev, trait]
+    );
+  };
+
+  const handleToggleItem = (item: StartingItem) => {
+    setSelectedItems(prev =>
+      prev.find(i => i.id === item.id)
+      ? prev.filter(i => i.id !== item.id)
+      : [...prev, item]
+    );
+  };
+
+  const handleToggleSkill = (skill: Skill) => {
+    setSelectedSkills(prev => {
+      const isCurrentlySelected = prev.some(s => s.id === skill.id);
+      if (isCurrentlySelected) {
+        return prev.filter(s => s.id !== skill.id); 
+      } else {
+        if (prev.length >= MAX_SKILL_PROFICIENCIES) return prev; 
+        if (prev.length < 2) { 
+          if (eligibleAttributesForFirstSkills.includes(skill.relatedAttribute)) return [...prev, skill];
+        } else { 
+          return [...prev, skill]; 
+        }
+      }
+      return prev; 
+    });
+  };
+
+  const handleToggleFlawFeat = (feat: Feat) => {
+    if (feat.isFlaw && feat.requirements.length === 0) {
+        setSelectedFlawFeats(prev => {
+        const isSelected = prev.find(f => f.id === feat.id);
+        return isSelected ? prev.filter(f => f.id !== feat.id) : [...prev, feat];
+        });
+    }
+  };
+  
+  const handleMadnessChange = (madnessId: string) => {
+    setSelectedMadness(madnessId === "none" ? undefined : AVAILABLE_MADNESS_EFFECTS.find(m => m.id === madnessId));
+  };
+
+  const handleRaceChange = (raceId: string) => {
+    const newRace = AVAILABLE_RACES.find(r => r.id === raceId);
+    setSelectedRace(newRace);
+
+    // If changing to Merman, unequip items from feet
+    if (newRace?.id === 'merman' && equipment.feet) {
+        setBackpack(prev => [...prev, equipment.feet!]);
+        setEquipment(prev => ({...prev, feet: null}));
+    }
+  };
+
+  const handleBackstoryGenerated = useCallback((newBackstory: string) => {
+    setBackstory(newBackstory);
+  }, []);
+
+  const handleApertureGradeChange = (gradeId: string) => {
+    const newGrade = APERTURE_GRADES.find(g => g.id === gradeId) || APERTURE_GRADES[0];
+    setSelectedApertureGradeId(gradeId);
+    
+    let newSpecificMax = specificMaxEssence;
+    if (specificMaxEssence < newGrade.minMaxEssence) {
+      newSpecificMax = newGrade.minMaxEssence;
+    } else if (specificMaxEssence > newGrade.maxMaxEssence) {
+      newSpecificMax = newGrade.maxMaxEssence;
+    }
+    setSpecificMaxEssence(newSpecificMax);
+
+    if (currentEssencePercentage > newSpecificMax) {
+        setCurrentEssencePercentage(newSpecificMax);
+    }
+  };
+
+  const handleSpecificMaxEssenceChange = (newMax: number) => {
+    const grade = currentApertureGrade;
+    const clampedMax = Math.max(grade.minMaxEssence, Math.min(newMax, grade.maxMaxEssence));
+    setSpecificMaxEssence(clampedMax);
+    if (currentEssencePercentage > clampedMax) {
+      setCurrentEssencePercentage(clampedMax);
+    }
+  };
+
+  const handleCharacterRankChange = (rankId: string) => setSelectedCharacterRankId(rankId);
+  const handleEssenceStageChange = (stageId: EssenceStageId) => setSelectedEssenceStageId(stageId);
+  
+  const handleEssencePercentageChange = (percentage: number) => {
+    setCurrentEssencePercentage(Math.max(0, Math.min(percentage, specificMaxEssence)));
+  };
+
+
+  // TIME AND REST LOGIC
+  const passTime = useCallback((hours: number) => {
+    const newGameTimeHours = gameTimeHours + hours;
+
+    if (currentApertureGrade.recoveryTimeHours > 0 && specificMaxEssence > 0) {
+        const regenerationRatePerHour = specificMaxEssence / currentApertureGrade.recoveryTimeHours;
+        const essenceToRegen = regenerationRatePerHour * hours;
+        setCurrentEssencePercentage(prev => Math.min(specificMaxEssence, parseFloat((prev + essenceToRegen).toFixed(2))));
+    }
+    
+    if (newGameTimeHours - lastExhaustionCheckTime >= 24 && newGameTimeHours - lastLongRestEndTime >= 24) {
+        const conMod = calculateModifier(finalAttributes.constitution);
+        const conSaveBonus = conMod + (conSavesProficiency ? currentProficiencyBonus : 0);
+        const conSaveRoll = Math.floor(Math.random() * 20) + 1 + conSaveBonus;
+        
+        const periodsWithoutRest = Math.floor((newGameTimeHours - lastLongRestEndTime) / 24);
+        const exhaustionDC = 10 + Math.max(0, periodsWithoutRest - 1) * 5;
+
+        if (conSaveRoll < exhaustionDC) {
+            setExhaustionLevel(prev => Math.min(6, prev + 1));
+        }
+        setLastExhaustionCheckTime(newGameTimeHours);
+    }
+    setGameTimeHours(newGameTimeHours);
+  }, [gameTimeHours, currentApertureGrade, specificMaxEssence, finalAttributes.constitution, currentProficiencyBonus, conSavesProficiency, lastLongRestEndTime, lastExhaustionCheckTime]);
+
+  const handleShortRest = useCallback(() => {
+    passTime(1);
+  }, [passTime]);
+
+  const handleLongRest = useCallback(() => {
+    if (gameTimeHours < lastLongRestEndTime + 16 && lastLongRestEndTime !== 0) {
+        alert("Вы не можете получить преимущества от еще одного продолжительного отдыха так скоро.");
+        return;
+    }
+    if (currentHp < 1) {
+        alert("У персонажа должен быть хотя бы 1 хит для получения преимуществ от продолжительного отдыха.");
+        return;
+    }
+
+    passTime(8);
+    setCurrentHp(maxHp);
+    
+    const hdToRecoverFactor = armorTypeWornForSleep === 'medium' || armorTypeWornForSleep === 'heavy' ? 4 : 2;
+    const hdRecovered = Math.max(1, Math.floor(maxHitDice / hdToRecoverFactor));
+    setCurrentHitDice(prev => Math.min(maxHitDice, prev + hdRecovered));
+
+    if (armorTypeWornForSleep !== 'medium' && armorTypeWornForSleep !== 'heavy') {
+      setExhaustionLevel(prev => Math.max(0, prev - 1));
+    }
+    
+    setLastLongRestEndTime(gameTimeHours + 8); 
+    setLastExhaustionCheckTime(gameTimeHours + 8); 
+
+  }, [passTime, currentHp, maxHp, maxHitDice, armorTypeWornForSleep, gameTimeHours, lastLongRestEndTime]);
+
+  const spendHitDice = useCallback((diceToSpend: number, onHeal: (totalHealed: number, rolls: string[]) => void) => {
+    if (diceToSpend <= 0 || diceToSpend > currentHitDice || currentHp >= maxHp) {
+      onHeal(0, []);
+      return;
+    }
+    let totalHealed = 0;
+    const conMod = calculateModifier(finalAttributes.constitution);
+    const rolls: number[] = [];
+    for (let i = 0; i < diceToSpend; i++) {
+      const roll = Math.floor(Math.random() * hitDieType) + 1;
+      rolls.push(roll);
+      totalHealed += Math.max(0, roll + conMod); 
+    }
+    setCurrentHp(prev => Math.min(maxHp, prev + totalHealed));
+    setCurrentHitDice(prev => prev - diceToSpend);
+    onHeal(totalHealed, rolls.map(String)); 
+  }, [currentHitDice, currentHp, maxHp, finalAttributes.constitution, hitDieType]);
+
+  const handleHitDieTypeChange = (newType: number) => {
+    setHitDieType(newType);
+  };
+  
+  const handleManualMaxHpModifierChange = (value: number) => {
+    setManualMaxHpModifier(value);
+  };
+
+  const handleManualAcModifierChange = (value: number) => {
+    setManualAcModifier(value);
+  };
+  
+  const handleItemDrop = useCallback((data: { instanceId: string, source: EquipmentSlotId | 'backpack' }, targetSlot: EquipmentSlotId | 'backpack') => {
+    // Prevent drop on feet for merman
+    if (selectedRace?.id === 'merman' && targetSlot === 'feet') {
+      return;
+    }
+    
+    // Find the item being moved
+    let itemToMove: InventoryItem | undefined;
+    let newBackpack = [...backpack];
+    let newEquipment = { ...equipment };
+
+    if (data.source === 'backpack') {
+        const itemIndex = newBackpack.findIndex(i => i.instanceId === data.instanceId);
+        if (itemIndex > -1) {
+            itemToMove = newBackpack[itemIndex];
+            newBackpack.splice(itemIndex, 1);
+        }
+    } else {
+        itemToMove = newEquipment[data.source] ?? undefined;
+        newEquipment[data.source] = null;
+    }
+
+    if (!itemToMove) return; // Should not happen
+
+    // Place item in new location
+    if (targetSlot === 'backpack') {
+        newBackpack.push(itemToMove);
+    } else {
+        // If there's an item in the target slot, move it to backpack
+        const existingItemInTarget = newEquipment[targetSlot];
+        if (existingItemInTarget) {
+            newBackpack.push(existingItemInTarget);
+        }
+        newEquipment[targetSlot] = itemToMove;
+    }
+
+    setBackpack(newBackpack);
+    setEquipment(newEquipment);
+  }, [backpack, equipment, selectedRace]);
+
+
+  useEffect(() => {
+    const newDerivedStats: string[] = [];
+    const dexMod = calculateModifier(finalAttributes.dexterity); 
+    const wisMod = calculateModifier(finalAttributes.wisdom);   
+    const intMod = calculateModifier(finalAttributes.intelligence); 
+
+    const allCurrentEffectiveFeats = [
+        ...activeFeats, 
+        ...selectedFlawFeats
+    ].filter((feat, index, self) => index === self.findIndex(f => f.id === feat.id));
+
+    newDerivedStats.push(`Хитпоинты: ${currentHp} / ${maxHp}`);
+    newDerivedStats.push(`Кости Хитов: ${currentHitDice} / ${maxHitDice} (d${hitDieType})`); // Updated to use hitDieType state
+    if (exhaustionLevel > 0) {
+        newDerivedStats.push(`Уровень Истощения: ${exhaustionLevel}`);
+    }
+
+
+    newDerivedStats.push(`Бонус Умения: +${currentProficiencyBonus}`);
+    
+    // Calculate AC from equipment
+    let acFromEquipment = 0;
+    const equippedArmor = equipment.armor ? AVAILABLE_STARTING_ITEMS.find(i => i.id === equipment.armor?.itemId) : null;
+    if (equippedArmor?.id === 'item_leather_armor') {
+        acFromEquipment = 1; // +1 from leather armor
+    }
+    
+    newDerivedStats.push(`Класс Брони (КБ): ${BASE_ARMOR_CLASS + dexMod + manualAcModifier + acFromEquipment}`);
+
+
+    SAVING_THROW_KEYS.forEach(key => {
+        const modifier = calculateModifier(finalAttributes[key]); 
+        const isProficient = (key === 'constitution' && conSavesProficiency); 
+        const totalSaveBonus = modifier + (isProficient ? currentProficiencyBonus : 0);
+        newDerivedStats.push(SAVING_THROW_NAMES_RU[key] + ': ' + (totalSaveBonus >= 0 ? '+' : '') + totalSaveBonus + (isProficient ? ' (Умение)' : ''));
+    });
+
+    let initiative = dexMod;
+    if (selectedTraits.find(t => t.id === 'trait_alert')) initiative += 2; 
+    newDerivedStats.push(`Концептуальная Инициатива: ${initiative >= 0 ? '+' : ''}${initiative}`);
+
+    let passivePerception = 10 + wisMod;
+    if (selectedSkills.find(s => s.id === 'skill_perception')) passivePerception += currentProficiencyBonus;
+    if (selectedTraits.find(t => t.id === 'trait_observant')) passivePerception += 5;
+    newDerivedStats.push(`Пассивная Внимательность (концепт): ${passivePerception}`);
+    
+    let speed = 30; 
+    if (allCurrentEffectiveFeats.find(f => f.id === 'feat_mobile')) speed += 10;
+    newDerivedStats.push(`Скорость (концепт): ${speed} футов`);
+
+    let languages = 1 + (intMod > 0 ? intMod : 0); 
+    if (selectedTraits.find(t => t.id === 'trait_linguist')) languages += 3;
+    newDerivedStats.push(`Известные языки (концепт): ${languages}`);
+    
+    if (selectedRace && selectedRace.textualEffects) {
+      selectedRace.textualEffects.forEach(effect => newDerivedStats.push(effect));
+    }
+
+    AVAILABLE_SKILLS.forEach(skill => {
+      const finalAttrScoreForSkill = finalAttributes[skill.relatedAttribute];
+      const attrMod = calculateModifier(finalAttrScoreForSkill);
+      const racialSkillMod = selectedRace?.skillModifiers?.[skill.id] || 0;
+      const proficiencyBonusForSkill = selectedSkills.some(s => s.id === skill.id) ? currentProficiencyBonus : 0;
+      const totalSkillMod = attrMod + racialSkillMod + proficiencyBonusForSkill;
+
+      if (racialSkillMod !== 0 || proficiencyBonusForSkill !== 0) { 
+        newDerivedStats.push(`Навык: ${skill.name}: ${totalSkillMod >= 0 ? '+' : ''}${totalSkillMod}`);
+      }
+    });
+
+    setDerivedStats(newDerivedStats);
+  }, [baseAttributes, finalAttributes, selectedRace, selectedTraits, selectedSkills, activeFeats, selectedFlawFeats, characterLevel, currentProficiencyBonus, currentHp, maxHp, currentHitDice, maxHitDice, hitDieType, exhaustionLevel, conSavesProficiency, manualMaxHpModifier, manualAcModifier, equipment]);
+
+
+  const currentCharacter: Character = {
+    name: characterName,
+    level: characterLevel,
+    proficiencyBonus: currentProficiencyBonus,
+    attributes: finalAttributes, 
+    selectedRace,
+    selectedTraits,
+    selectedItems,
+    selectedSkills,
+    activeFeats: [ 
+        ...activeFeats, 
+        ...selectedFlawFeats.filter(sf => !activeFeats.find(af => af.id === sf.id))
+    ].filter((feat, index, self) => index === self.findIndex(f => f.id === feat.id)), 
+    madnessEffect: selectedMadness,
+    attributeBuyPoints, 
+    modificationPoints,
+    backstory,
+    apertureGradeId: selectedApertureGradeId,
+    characterRankId: selectedCharacterRankId,
+    selectedEssenceStageId: selectedEssenceStageId,
+    currentEssencePercentage: currentEssencePercentage,
+    specificMaxEssence: specificMaxEssence,
+    maxHp,
+    currentHp,
+    hitDieType,
+    maxHitDice,
+    currentHitDice,
+    gameTimeHours,
+    lastLongRestEndTime,
+    lastExhaustionCheckTime,
+    exhaustionLevel,
+    armorTypeWornForSleep,
+    conSavesProficiency,
+    manualMaxHpModifier,
+    manualAcModifier,
+    equipment,
+    backpack,
+  };
+
+  const handleSaveCharacter = () => {
+    if (!selectedRace) { alert("Пожалуйста, выберите расу для вашего персонажа."); return; }
+    if (attributeBuyPoints > 0) { alert('У вас осталось ' + attributeBuyPoints + ' очков для распределения характеристик.'); return; }
+    if (attributeBuyPoints < 0) { alert('Вы потратили слишком много очков характеристик! Скорректируйте значения.'); return;}
+    if (modificationPoints < 0) { alert('У вас дефицит в ' + Math.abs(modificationPoints) + ' Очков Модификации. Скорректируйте особенности, предметы, безумие или изъяны.'); return; }
+    if (selectedSkills.length !== MAX_SKILL_PROFICIENCIES && MAX_SKILL_PROFICIENCIES > 0) { alert('Пожалуйста, выберите ровно ' + MAX_SKILL_PROFICIENCIES + ' владений навыками.'); return; }
+    if (!characterName.trim()) { alert("Пожалуйста, введите имя персонажа."); return; }
+
+    const characterToSave: CharacterSaveData = {
+        name: characterName,
+        level: characterLevel,
+        baseAttributes: baseAttributes,
+        attributeBuyPoints: attributeBuyPoints,
+        modificationPoints: modificationPoints,
+        selectedRaceId: selectedRace?.id,
+        selectedTraitIds: selectedTraits.map(t => t.id),
+        selectedItemIds: selectedItems.map(i => i.id),
+        selectedSkillIds: selectedSkills.map(s => s.id),
+        selectedFlawFeatIds: selectedFlawFeats.map(f => f.id),
+        madnessEffectId: selectedMadness?.id,
+        backstory: backstory,
+        apertureGradeId: selectedApertureGradeId,
+        characterRankId: selectedCharacterRankId,
+        selectedEssenceStageId: selectedEssenceStageId,
+        currentEssencePercentage: currentEssencePercentage,
+        specificMaxEssence: specificMaxEssence,
+        currentHp: currentHp,
+        hitDieType: hitDieType,
+        currentHitDice: currentHitDice,
+        gameTimeHours: gameTimeHours,
+        lastLongRestEndTime: lastLongRestEndTime,
+        lastExhaustionCheckTime: lastExhaustionCheckTime,
+        exhaustionLevel: exhaustionLevel,
+        armorTypeWornForSleep: armorTypeWornForSleep,
+        manualMaxHpModifier: manualMaxHpModifier,
+        manualAcModifier: manualAcModifier,
+        equipment: equipment,
+        backpack: backpack,
+    };
+
+    const jsonData = JSON.stringify(characterToSave, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeCharacterName = characterName.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'character';
+    link.download = `${safeCharacterName}_character_RI.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    // setShowSummary(true); // No longer switch to summary
+  }
+
+  const handleLoadCharacterFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/json") {
+        alert("Пожалуйста, выберите действительный файл JSON.");
+        if(fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const json = e.target?.result as string;
+            const loadedData = JSON.parse(json) as any; // Use `any` for migration purposes
+
+            // Basic validation of loaded data structure (can be expanded)
+            if (!loadedData.name || !loadedData.baseAttributes || !loadedData.selectedTraitIds) {
+                throw new Error("Файл персонажа имеет неверный формат.");
+            }
+
+            // MIGRATION: from 'hands' to 'hands_L'
+            if (loadedData.equipment && loadedData.equipment.hands) {
+                if (!loadedData.equipment.hands_L) { // Only migrate if hands_L doesn't exist
+                    loadedData.equipment.hands_L = loadedData.equipment.hands;
+                }
+                delete loadedData.equipment.hands; // Remove old key
+            }
+
+            // Prepare data that affects useEffects before setting state
+            const race = AVAILABLE_RACES.find(r => r.id === loadedData.selectedRaceId);
+            const loadedFinalAttributes = calculateFinalAttributes(loadedData.baseAttributes, race);
+            const newEligibleAttrs = getTopAttributeKeysForSkillSelection(loadedFinalAttributes);
+
+            // Set all states in one batch to prevent race conditions with useEffect
+            setCharacterName(loadedData.name);
+            setCharacterLevel(loadedData.level);
+            setBaseAttributes(loadedData.baseAttributes);
+            setAttributeBuyPoints(loadedData.attributeBuyPoints);
+            // modificationPoints will be recalculated by useEffect
+
+            setSelectedRace(race || defaultRace);
+            setEligibleAttributesForFirstSkills(newEligibleAttrs); // <-- FIX: Set eligible attributes to prevent skill reset
+
+            setSelectedTraits(loadedData.selectedTraitIds.map((id: string) => AVAILABLE_TRAITS.find(t => t.id === id)).filter(Boolean) as Trait[]);
+            setSelectedItems(loadedData.selectedItemIds.map((id: string) => AVAILABLE_STARTING_ITEMS.find(i => i.id === id)).filter(Boolean) as StartingItem[]);
+            setSelectedSkills(loadedData.selectedSkillIds.map((id: string) => AVAILABLE_SKILLS.find(s => s.id === id)).filter(Boolean) as Skill[]);
+            setSelectedFlawFeats(loadedData.selectedFlawFeatIds.map((id: string) => AVAILABLE_FEATS.find(f => f.id === id && f.isFlaw && f.requirements.length === 0)).filter(Boolean) as Feat[]);
+            setSelectedMadness(AVAILABLE_MADNESS_EFFECTS.find(m => m.id === loadedData.madnessEffectId));
+            
+            setBackstory(loadedData.backstory);
+            
+            setEquipment(loadedData.equipment || {});
+            setBackpack(loadedData.backpack || []);
+
+            setSelectedApertureGradeId(loadedData.apertureGradeId || defaultApertureGrade.id);
+            setSelectedCharacterRankId(loadedData.characterRankId || CHARACTER_RANKS[0].id);
+            setSelectedEssenceStageId(loadedData.selectedEssenceStageId || ESSENCE_STAGES[0].id);
+            setCurrentEssencePercentage(loadedData.currentEssencePercentage !== undefined ? loadedData.currentEssencePercentage : defaultApertureGrade.minMaxEssence);
+            setSpecificMaxEssence(loadedData.specificMaxEssence !== undefined ? loadedData.specificMaxEssence : defaultApertureGrade.minMaxEssence);
+            
+            setHitDieType(loadedData.hitDieType || DEFAULT_HIT_DIE_TYPE);
+            // maxHp, maxHitDice will be recalculated
+            setCurrentHp(loadedData.currentHp);
+            setCurrentHitDice(loadedData.currentHitDice);
+
+            setGameTimeHours(loadedData.gameTimeHours || 8);
+            setLastLongRestEndTime(loadedData.lastLongRestEndTime || 0);
+            setLastExhaustionCheckTime(loadedData.lastExhaustionCheckTime || 0);
+            setExhaustionLevel(loadedData.exhaustionLevel || 0);
+            setArmorTypeWornForSleep(loadedData.armorTypeWornForSleep || 'none');
+            
+            setManualMaxHpModifier(loadedData.manualMaxHpModifier || 0);
+            setManualAcModifier(loadedData.manualAcModifier || 0);
+            
+            // Allow useEffects to run and recalculate derived stats
+            setShowSummary(false); // Stay on edit screen
+            alert(`Персонаж "${loadedData.name}" успешно загружен.`);
+
+        } catch (error) {
+            console.error("Ошибка загрузки персонажа:", error);
+            alert(`Не удалось загрузить персонажа: ${error instanceof Error ? error.message : "Неизвестная ошибка."}`);
+        } finally {
+            if(fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+        }
+    };
+    reader.readAsText(file);
+  };
+
+  const resetCreator = () => {
+    setCharacterName('Незнакомец');
+    setCharacterLevel(1);
+    const newDefaultRace = AVAILABLE_RACES.find(r => r.id === 'human') || (AVAILABLE_RACES.length > 0 ? AVAILABLE_RACES[0] : undefined);
+    setSelectedRace(newDefaultRace);
+    setBaseAttributes(initialBaseAttributes); 
+    setAttributeBuyPoints(INITIAL_ATTRIBUTE_BUY_POINTS);
+    setSelectedTraits([]);
+    setSelectedItems([]);
+    setSelectedMadness(undefined);
+    setSelectedSkills([]);
+    setSelectedFlawFeats([]);
+    setBackstory(undefined);
+    
+    setEquipment({});
+    setBackpack([]);
+
+    const initialGrade = APERTURE_GRADES[1]; 
+    setSelectedApertureGradeId(initialGrade.id);
+    const initialSpecificMax = initialGrade.minMaxEssence;
+    setSpecificMaxEssence(initialSpecificMax);
+    setSelectedCharacterRankId(CHARACTER_RANKS[0].id);
+    setSelectedEssenceStageId(ESSENCE_STAGES[0].id);
+    setCurrentEssencePercentage(initialSpecificMax); 
+
+    setHitDieType(DEFAULT_HIT_DIE_TYPE); // Reset hit die type
+    setManualMaxHpModifier(0); // Reset manual HP modifier
+    setManualAcModifier(0); // Reset manual AC modifier
+    // MaxHP, CurrentHP, MaxHitDice, CurrentHitDice will be recalculated by useEffects
+    
+    setGameTimeHours(8); 
+    setLastLongRestEndTime(0);
+    setLastExhaustionCheckTime(0);
+    setExhaustionLevel(0);
+    setArmorTypeWornForSleep('none');
+    setConSavesProficiency(false);
+
+    setShowSummary(false);
+    setEligibleAttributesForFirstSkills(getTopAttributeKeysForSkillSelection(calculateFinalAttributes(initialBaseAttributes, newDefaultRace)));
+  }
+
+  const madnessDropdownOptions: MadnessOption[] = [
+    { id: "none", name: "Нет", description: "Без начального эффекта безумия.", type: "none", modificationPointAdjustment: 0 },
+    ...AVAILABLE_MADNESS_EFFECTS
+  ];
+  
+  const handleLevelChange = (increment: boolean) => {
+    setCharacterLevel(prevLevel => {
+        const newLevel = increment ? prevLevel + 1 : prevLevel -1;
+        const finalNewLevel = newLevel < 1 ? 1 : newLevel;
+        setMaxHitDice(finalNewLevel);
+        setCurrentHitDice(prevHD => Math.min(finalNewLevel, prevHD)); 
+        return finalNewLevel; 
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-slate-200 p-4 md:p-8 flex flex-col items-center">
+      <header className="mb-8 text-center">
+        <h1 className="text-5xl font-bold text-red-500 tracking-tight">Reverend Insanity</h1>
+        <p className="text-xl text-slate-300">Создатель Персонажей (Телепортирован в мир Преподобного Гу)</p>
+      </header>
+
+      {!showSummary ? (
+        <div className="w-full max-w-5xl space-y-6">
+          <SectionPanel title="Производные Эффекты и Состояния">
+            {derivedStats.length > 0 ? (
+              <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 items-stretch">
+                {derivedStats.map((statString, index) => {
+                  const parsed = parseDerivedStatValue(statString);
+                  if (parsed.isApertureInfo) return null; 
+
+                  const valueFontSize = parsed.isSkill || parsed.isHpInfo ? 'text-xl' : 'text-3xl';
+                  const labelFontSize = parsed.isSkill || parsed.isHpInfo ? 'text-xs' : 'text-xs';
+                  const containerClasses = !parsed.isNumeric && !parsed.isHpInfo ? 'col-span-2 sm:col-span-full md:col-span-full lg:col-span-full' : '';
+
+                  return (
+                    <li key={index} className={`flex flex-col items-center justify-center p-3 bg-slate-800/70 rounded-lg text-center h-full shadow-lg ${containerClasses}`}>
+                      {parsed.IconComponent && <parsed.IconComponent className={`h-6 w-6 mb-1.5 ${parsed.iconColor}`} />}
+                      {parsed.isNumeric ? (
+                        <>
+                          <span className={`${valueFontSize} font-bold ${parsed.valueColor}`}>{parsed.value}{parsed.suffix}</span>
+                          <span className={`${labelFontSize} text-slate-400 mt-1`}>{parsed.label}</span>
+                        </>
+                      ) : (
+                         parsed.isHpInfo ? ( 
+                            <>
+                                <span className={`${valueFontSize} font-bold ${parsed.valueColor}`}>{parsed.value}</span>
+                                <span className={`${labelFontSize} text-slate-400 mt-1 flex items-center justify-center`}>
+                                  {parsed.label} {parsed.suffix}
+                                  {parsed.isHitDieInfo && (
+                                    <HitDieTypeEditor
+                                        currentValue={hitDieType}
+                                        onChange={handleHitDieTypeChange}
+                                        disabled={showSummary}
+                                    />
+                                  )}
+                                </span>
+                            </>
+                         ) : (
+                            <div className="text-left w-full">
+                               <span className={`text-sm text-slate-300`}><strong className={parsed.iconColor || 'text-sky-400'}>{parsed.label}:</strong> {parsed.value}</span>
+                            </div>
+                         )
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-slate-400 italic">Рассчитываем эффекты...</p>
+            )}
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mt-4 pt-3 border-t border-slate-700">
+                <div>
+                    <label htmlFor="manualMaxHpMod" className="block text-sm font-medium text-slate-300 mb-1">
+                        <HeartIcon className="inline h-4 w-4 mr-1 text-red-400" />
+                        Модификатор Макс. ХП:
+                    </label>
+                    <div className="flex items-center space-x-2 max-w-xs mx-auto md:mx-0">
+                        <button
+                            onClick={() => handleManualMaxHpModifierChange(manualMaxHpModifier - 1)}
+                            className="p-1.5 bg-red-700 hover:bg-red-600 rounded-full text-white disabled:bg-slate-600"
+                            disabled={showSummary}
+                            aria-label="Уменьшить модификатор макс. ХП"
+                        >
+                            <MinusIcon />
+                        </button>
+                        <input
+                            type="number"
+                            id="manualMaxHpMod"
+                            value={manualMaxHpModifier}
+                            onChange={(e) => handleManualMaxHpModifierChange(parseInt(e.target.value) || 0)}
+                            className="w-20 text-center bg-slate-700/80 border border-slate-600 text-slate-100 rounded-md p-1.5 focus:ring-red-500 focus:border-red-500 transition duration-150 tabular-nums"
+                            disabled={showSummary}
+                            aria-label="Ручной модификатор максимальных ХП"
+                        />
+                        <button
+                            onClick={() => handleManualMaxHpModifierChange(manualMaxHpModifier + 1)}
+                            className="p-1.5 bg-green-600 hover:bg-green-500 rounded-full text-white disabled:bg-slate-600"
+                            disabled={showSummary}
+                            aria-label="Увеличить модификатор макс. ХП"
+                        >
+                            <PlusIcon />
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label htmlFor="manualAcMod" className="block text-sm font-medium text-slate-300 mb-1">
+                        <ArmorClassIcon className="inline h-4 w-4 mr-1 text-blue-400" />
+                        Модификатор КБ:
+                    </label>
+                    <div className="flex items-center space-x-2 max-w-xs mx-auto md:mx-0">
+                        <button
+                            onClick={() => handleManualAcModifierChange(manualAcModifier - 1)}
+                            className="p-1.5 bg-red-700 hover:bg-red-600 rounded-full text-white disabled:bg-slate-600"
+                            disabled={showSummary}
+                            aria-label="Уменьшить модификатор КБ"
+                        >
+                            <MinusIcon />
+                        </button>
+                        <input
+                            type="number"
+                            id="manualAcMod"
+                            value={manualAcModifier}
+                            onChange={(e) => handleManualAcModifierChange(parseInt(e.target.value) || 0)}
+                            className="w-20 text-center bg-slate-700/80 border border-slate-600 text-slate-100 rounded-md p-1.5 focus:ring-blue-500 focus:border-blue-500 transition duration-150 tabular-nums"
+                            disabled={showSummary}
+                            aria-label="Ручной модификатор Класса Брони"
+                        />
+                        <button
+                            onClick={() => handleManualAcModifierChange(manualAcModifier + 1)}
+                            className="p-1.5 bg-green-600 hover:bg-green-500 rounded-full text-white disabled:bg-slate-600"
+                            disabled={showSummary}
+                            aria-label="Увеличить модификатор КБ"
+                        >
+                            <PlusIcon />
+                        </button>
+                    </div>
+                </div>
+            </div>
+             <p className="text-xs text-slate-500 mt-3">Примечание: Эти значения являются концептуальными и основаны на стандартных правилах D&D 5e и элементах мира Reverend Insanity.</p>
+          </SectionPanel>
+
+          <SectionPanel title="Уровень Персонажа">
+            <div className="flex items-center justify-center space-x-4">
+                <button
+                    onClick={() => handleLevelChange(false)}
+                    disabled={characterLevel <= 1}
+                    className="p-2 bg-red-700 hover:bg-red-600 rounded-full text-white disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Уменьшить уровень"
+                >
+                    <MinusIcon className="w-6 h-6"/>
+                </button>
+                <span className="text-3xl font-bold text-yellow-400 tabular-nums">{characterLevel}</span>
+                <button
+                    onClick={() => handleLevelChange(true)}
+                    className="p-2 bg-green-600 hover:bg-green-500 rounded-full text-white transition-colors"
+                    aria-label="Увеличить уровень"
+                >
+                    <PlusIcon className="w-6 h-6"/>
+                </button>
+            </div>
+            <p className="text-center text-sm text-slate-400 mt-2">
+                Текущий Бонус Умения: <strong className="text-yellow-300">+{currentProficiencyBonus}</strong>
+            </p>
+         </SectionPanel>
+
+        <CharacterStatusPanel
+            character={currentCharacter}
+            onPassTime={passTime}
+            onShortRest={handleShortRest}
+            onLongRest={handleLongRest}
+            onSpendHitDice={spendHitDice}
+            onArmorTypeChange={setArmorTypeWornForSleep}
+            onCurrentHpChange={setCurrentHp}
+        />
+        
+        <SectionPanel title="Инвентарь и Экипировка">
+            <Inventory 
+                character={currentCharacter}
+                equipment={equipment}
+                backpack={backpack}
+                onItemDrop={handleItemDrop}
+            />
+        </SectionPanel>
+        
+         <SectionPanel title="Состояние Апертуры и Первобытной Эссенции">
+            <ApertureDisplay
+                selectedGradeId={selectedApertureGradeId}
+                onGradeChange={handleApertureGradeChange}
+                selectedRankId={selectedCharacterRankId}
+                onRankChange={handleCharacterRankChange}
+                selectedStageId={selectedEssenceStageId}
+                onStageChange={handleEssenceStageChange}
+                currentEssencePercentage={currentEssencePercentage}
+                onEssenceChange={handleEssencePercentageChange}
+                specificMaxEssence={specificMaxEssence}
+                onSpecificMaxEssenceChange={handleSpecificMaxEssenceChange}
+            />
+         </SectionPanel>
+
+
+          <SectionPanel title="Личность и Происхождение">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="characterName" className="block text-sm font-medium text-slate-300 mb-1">Имя Персонажа</label>
+                <input
+                  type="text"
+                  id="characterName"
+                  value={characterName}
+                  onChange={(e) => setCharacterName(e.target.value)}
+                  className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500 transition duration-150"
+                  placeholder="Введите имя персонажа"
+                />
+              </div>
+              <div>
+                <DropdownSelect
+                  label="Раса"
+                  value={selectedRace?.id || ""}
+                  options={AVAILABLE_RACES}
+                  onChange={handleRaceChange}
+                  getOptionValue={(option: Race) => option.id}
+                  getOptionLabel={(option: Race) => option.name}
+                  id="race-select"
+                />
+              </div>
+            </div>
+            {selectedRace && (
+              <div className="mt-4 p-3 bg-slate-700/30 rounded-md shadow">
+                <h4 className="text-md font-semibold text-red-300 mb-1">{selectedRace.name}</h4>
+                <p className="text-sm text-slate-300 mb-2">{selectedRace.description}</p>
+                {selectedRace.hitDieInfoText && (
+                    <p className="text-sm text-yellow-300 mb-1.5">{selectedRace.hitDieInfoText}</p>
+                )}
+                {selectedRace.specialAbilities.length > 0 && (
+                  <div>
+                    <h5 className="text-sm font-medium text-slate-200 mb-0.5">Особые способности расы:</h5>
+                    <ul className="list-disc list-inside text-xs text-slate-300 space-y-0.5">
+                      {selectedRace.specialAbilities.map((ability, idx) => (
+                        <li key={idx}>{ability}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                 {selectedRace.attributeModifiers && Object.keys(selectedRace.attributeModifiers).length > 0 && (
+                    <div className="mt-1.5">
+                        <h5 className="text-sm font-medium text-slate-200 mb-0.5">Расовые модификаторы характеристик:</h5>
+                        <ul className="list-disc list-inside text-xs text-slate-300 space-y-0.5">
+                        {Object.entries(selectedRace.attributeModifiers).map(([attr, mod]) => (
+                            <li key={attr}>{DND_ATTRIBUTE_NAMES_RU[attr as DndAttribute]}: {mod! > 0 ? '+' : ''}{mod}</li>
+                        ))}
+                        </ul>
+                    </div>
+                 )}
+                 {selectedRace.skillModifiers && Object.keys(selectedRace.skillModifiers).length > 0 && (
+                    <div className="mt-1.5">
+                        <h5 className="text-sm font-medium text-slate-200 mb-0.5">Расовые модификаторы навыков:</h5>
+                        <ul className="list-disc list-inside text-xs text-slate-300 space-y-0.5">
+                        {Object.entries(selectedRace.skillModifiers).map(([skillId, mod]) => {
+                            const skill = AVAILABLE_SKILLS.find(s => s.id === skillId);
+                            return (
+                                <li key={skillId}>{skill ? skill.name : skillId}: {mod > 0 ? '+' : ''}{mod}</li>
+                            );
+                        })}
+                        </ul>
+                    </div>
+                  )}
+              </div>
+            )}
+          </SectionPanel>
+
+          <SectionPanel title="Характеристики">
+            <AttributeEditor 
+              attributes={baseAttributes} 
+              onAttributesChange={setBaseAttributes}
+              attributeBuyPoints={attributeBuyPoints}
+              onAttributeBuyPointsChange={setAttributeBuyPoints}
+              modificationPoints={modificationPoints}
+              onModificationPointsChange={setModificationPoints} 
+              racialModifiers={selectedRace?.attributeModifiers} 
+            />
+          </SectionPanel>
+          
+          <SectionPanel title="Особенности (Трейты) и Стартовое Снаряжение">
+            <p className="text-sm text-slate-400 mb-3">
+                Доступные Очки Модификации: <span className={'font-bold ' + (modificationPoints < 0 ? 'text-red-400' : 'text-green-400')}>{modificationPoints}</span>
+            </p>
+            <p className="text-xs text-slate-500 mb-3">
+                Выбранные здесь предметы автоматически появятся в вашем рюкзаке в панели "Инвентарь и Экипировка" выше.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div>
+                <h4 className="text-lg font-semibold text-red-300 mb-2 flex items-center"><BookOpenIcon className="mr-2 text-red-400"/>Особенности (Трейты)</h4>
+                {AVAILABLE_TRAITS.length > 0 ? AVAILABLE_TRAITS.map(trait => (
+                  <div key={trait.id} className="flex items-center justify-between p-2 bg-slate-700/40 rounded mb-1.5 hover:bg-slate-600/50 transition-colors">
+                    <div className="flex-grow mr-2">
+                      <label htmlFor={'trait-' + trait.id} className="text-slate-200 cursor-pointer">
+                        {trait.name} <span className="text-xs text-slate-400">({trait.description})</span>
+                      </label>
+                      <p className={'text-xs ' + (trait.modificationPointCost <= 0 ? 'text-green-400' : 'text-yellow-400')}>
+                        {trait.modificationPointCost < 0 ? 'Дает ОМ: ' + (trait.modificationPointCost * -1) : 'Стоимость ОМ: ' + trait.modificationPointCost}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      id={'trait-' + trait.id}
+                      checked={selectedTraits.some(t => t.id === trait.id)}
+                      onChange={() => handleToggleTrait(trait)}
+                      className="form-checkbox h-5 w-5 text-red-500 bg-slate-600 border-slate-500 rounded focus:ring-red-600 cursor-pointer flex-shrink-0"
+                    />
+                  </div>
+                )) : <p className="text-slate-400 italic text-sm">Положительные особенности не найдены или все изъяны перенесены.</p>}
+              </div>
+              <div>
+                <h4 className="text-lg font-semibold text-red-300 mb-2 flex items-center"><BackpackIcon className="mr-2 text-red-400"/>Стартовые Предметы</h4>
+                 {AVAILABLE_STARTING_ITEMS.map(item => (
+                  <div key={item.id} className="flex items-center justify-between p-2 bg-slate-700/40 rounded mb-1.5 hover:bg-slate-600/50 transition-colors">
+                    <div className="flex-grow mr-2">
+                      <label htmlFor={'item-' + item.id} className="text-slate-200 cursor-pointer">
+                        {item.name} <span className="text-xs text-slate-400">({item.description})</span>
+                      </label>
+                       <p className={'text-xs ' + (item.modificationPointCost === 0 ? 'text-slate-400' : 'text-yellow-400')}>
+                        Стоимость ОМ: {item.modificationPointCost}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      id={'item-' + item.id}
+                      checked={selectedItems.some(i => i.id === item.id)}
+                      onChange={() => handleToggleItem(item)}
+                      className="form-checkbox h-5 w-5 text-red-500 bg-slate-600 border-slate-500 rounded focus:ring-red-600 cursor-pointer flex-shrink-0"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </SectionPanel>
+
+          <SectionPanel title="Владение Навыками">
+            <p className="text-sm text-slate-400 mb-1">
+              Выберите {MAX_SKILL_PROFICIENCIES} владения навыками. Владение добавляет ваш Бонус Умения (<strong className="text-yellow-300">+{currentProficiencyBonus}</strong>) к проверкам навыка.
+            </p>
+            {selectedSkills.length < 2 ? (
+              <p className="text-xs text-slate-500 mb-3">
+                Первые два навыка должны быть выбраны из списка навыков, относящихся к вашим двум наивысшим итоговым характеристикам (включая расовые моды).
+                <br />
+                Текущие доступные группы характеристик: <strong className="text-yellow-400">{eligibleAttributesForFirstSkills.map(attr => DND_ATTRIBUTE_NAMES_RU[attr]).join(', ') || 'Нет доступных из-за низких характеристик'}</strong>.
+                <br />
+                Третий навык можно будет выбрать из любого списка после этого.
+              </p>
+            ) : selectedSkills.length === 2 ? (
+              <p className="text-xs text-slate-500 mb-3">
+                Отлично! Теперь выберите ваш <strong className="text-indigo-400">третий (и последний) навык</strong> из любого доступного списка ниже.
+              </p>
+            ) : (
+              <p className="text-xs text-slate-500 mb-3">
+                Все {MAX_SKILL_PROFICIENCIES} навыка выбраны. Вы можете изменить свой выбор. При значимом изменении характеристик выбор навыков может быть сброшен.
+              </p>
+            )}
+            <p className="text-sm text-slate-400 mb-3">
+              Выбрано: <span className="font-bold text-red-400">{selectedSkills.length} / {MAX_SKILL_PROFICIENCIES}</span>
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {AVAILABLE_SKILLS.map(skill => {
+                const isSelected = selectedSkills.some(s => s.id === skill.id);
+                const skillIndexInSelection = selectedSkills.findIndex(s => s.id === skill.id);
+                let isDisabled = false;
+                let currentSkillDisplayClass = '';
+
+                if (isSelected) {
+                    isDisabled = false; 
+                    if (selectedSkills.length === MAX_SKILL_PROFICIENCIES && skillIndexInSelection === MAX_SKILL_PROFICIENCIES - 1) {
+                        currentSkillDisplayClass = 'bg-indigo-600/70 ring-2 ring-indigo-400'; 
+                    } else {
+                        currentSkillDisplayClass = 'bg-red-700/60 ring-2 ring-red-500'; 
+                    }
+                } else { 
+                    if (selectedSkills.length >= MAX_SKILL_PROFICIENCIES) {
+                        isDisabled = true; 
+                        currentSkillDisplayClass = 'bg-slate-800/50 opacity-60 cursor-not-allowed';
+                    } else if (selectedSkills.length < 2) { 
+                        if (eligibleAttributesForFirstSkills.includes(skill.relatedAttribute)) {
+                            isDisabled = false; 
+                            currentSkillDisplayClass = 'bg-slate-700/40 hover:bg-slate-600/50';
+                        } else {
+                            isDisabled = true; 
+                            currentSkillDisplayClass = 'bg-slate-800/50 opacity-60 cursor-not-allowed';
+                        }
+                    } else { 
+                        isDisabled = false; 
+                        currentSkillDisplayClass = 'bg-slate-700/40 hover:bg-slate-600/50';
+                    }
+                }
+                
+                return (
+                    <div key={skill.id} className={'p-3 rounded-md transition-all duration-150 ease-in-out ' + currentSkillDisplayClass}>
+                    <label className={'flex items-center space-x-3 ' + (isDisabled ? 'cursor-not-allowed' : 'cursor-pointer')}>
+                        <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSkill(skill)}
+                        disabled={isDisabled}
+                        className="form-checkbox h-5 w-5 text-red-500 bg-slate-600 border-slate-500 rounded focus:ring-red-600 disabled:opacity-70 disabled:cursor-not-allowed"
+                        />
+                        <div className="flex-grow">
+                        <span className={'font-medium ' + (isDisabled && !isSelected ? 'text-slate-400' : 'text-slate-100')}>{skill.name}</span>
+                        <p className={'text-xs ' + (isDisabled && !isSelected ? 'text-slate-500' : 'text-slate-400')}>{skill.description} (Основан на: <span className="capitalize">{DND_ATTRIBUTE_NAMES_RU[skill.relatedAttribute]}</span>)</p>
+                        </div>
+                    </label>
+                    </div>
+                );
+              })}
+            </div>
+          </SectionPanel>
+
+          <SectionPanel title="Черты и Изъяны">
+             <p className="text-sm text-slate-400 mb-3">
+              Некоторые черты и изъяны активируются автоматически при выполнении требований по итоговым характеристикам. Другие изъяны (без требований) можно выбрать для получения Очков Модификации.
+            </p>
+            <div className="space-y-3">
+              {AVAILABLE_FEATS.map(feat => {
+                const isStatRequirementMet = checkFeatRequirements(feat, finalAttributes); 
+                const isAutoActiveBeneficial = !feat.isFlaw && feat.requirements.length > 0 && isStatRequirementMet;
+                const isAutoActiveStatFlaw = feat.isFlaw && feat.requirements.length > 0 && isStatRequirementMet;
+                const isChosenManualFlaw = feat.isFlaw && feat.requirements.length === 0 && selectedFlawFeats.some(cf => cf.id === feat.id);
+                
+                const isActive = isAutoActiveBeneficial || isAutoActiveStatFlaw || isChosenManualFlaw;
+                let displayClass = 'bg-slate-700/40';
+                let icon = <XCircleIcon className="text-slate-500" />;
+
+                if (isActive) {
+                  if (feat.isFlaw) {
+                    displayClass = 'bg-yellow-700/30 border-l-4 border-yellow-500'; 
+                    icon = <ShieldExclamationIcon className="text-yellow-400" />;
+                  } else {
+                    displayClass = 'bg-green-700/30 border-l-4 border-green-500'; 
+                    icon = <CheckCircleIcon className="text-green-400" />;
+                  }
+                } else if (feat.requirements.length > 0 && !isStatRequirementMet) {
+                     icon = <XCircleIcon className="text-slate-500" />;
+                }
+
+
+                const canBeManuallyChosenFlaw = feat.isFlaw && feat.requirements.length === 0;
+
+                return (
+                  <div key={feat.id} className={'p-3 rounded-md ' + displayClass}>
+                    <div className="flex items-center justify-between">
+                        <h5 className={'font-semibold ' + (isActive ? (feat.isFlaw ? 'text-yellow-300' : 'text-green-300') : 'text-slate-200')}>{feat.name}</h5>
+                        <div className="flex items-center">
+                          {canBeManuallyChosenFlaw && (
+                            <input
+                              type="checkbox"
+                              checked={isChosenManualFlaw}
+                              onChange={() => handleToggleFlawFeat(feat)}
+                              className="form-checkbox h-5 w-5 text-yellow-500 bg-slate-600 border-slate-500 rounded focus:ring-yellow-600 cursor-pointer mr-3"
+                              aria-label={'Выбрать изъян ' + feat.name}
+                            />
+                          )}
+                          {icon}
+                        </div>
+                    </div>
+                    <p className="text-sm text-slate-300 mt-1">{feat.description}</p>
+                    {feat.requirements.length > 0 && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        Требуется: {feat.requirements.map(r => 
+                            DND_ATTRIBUTE_NAMES_RU[r.attribute] + ' ' + 
+                            (r.minValue !== undefined ? r.minValue + '+' : '') + 
+                            (r.maxValue !== undefined ? r.maxValue + '-' : '')
+                        ).join(', ')}
+                        {!isStatRequirementMet && <span className="text-red-400 ml-1">({feat.isFlaw ? 'Условие для изъяна не выполнено' : 'Неактивно'})</span>}
+                      </p>
+                    )}
+                    {canBeManuallyChosenFlaw && isChosenManualFlaw && feat.modificationPointAdjustment && feat.modificationPointAdjustment > 0 && (
+                      <p className="text-xs mt-0.5 text-green-400">
+                        Дает ОМ: {feat.modificationPointAdjustment}
+                      </p>
+                    )}
+                    {!feat.isFlaw && feat.modificationPointAdjustment && feat.modificationPointAdjustment < 0 && isActive && (
+                       <p className="text-xs mt-0.5 text-yellow-400">
+                        Стоит ОМ: {Math.abs(feat.modificationPointAdjustment)}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </SectionPanel>
+          
+          <SectionPanel title="Психическое Состояние (Опциональный Изъян для Очков Модификации)">
+             <DropdownSelect
+                label="Начальный Эффект Безумия"
+                value={selectedMadness?.id || "none"}
+                options={madnessDropdownOptions}
+                onChange={handleMadnessChange}
+                getOptionValue={(option: MadnessOption) => option.id}
+                getOptionLabel={(option: MadnessOption) => 
+                  option.name + ' (' + (option.modificationPointAdjustment === 0 && option.id !== "none" ? '+0' : (option.modificationPointAdjustment < 0 ? '+' + (option.modificationPointAdjustment * -1) : '0') ) + ' ОМ)'
+                }
+                id="madness-select"
+              />
+              {selectedMadness && selectedMadness.id !== "none" && (
+                <div className="p-2 bg-slate-700/30 rounded text-sm text-slate-300">
+                    <p><strong>Тип:</strong> {selectedMadness.type === "short-term" ? "краткосрочное" : selectedMadness.type === "long-term" ? "долгосрочное" : "бессрочное"}</p>
+                    <p><strong>Эффект:</strong> {selectedMadness.description}</p>
+                </div>
+              )}
+          </SectionPanel>
+
+          <SectionPanel title="Хроника от ИИ (Опционально)">
+             <GeminiFeature character={currentCharacter} onBackstoryGenerated={handleBackstoryGenerated} />
+             {backstory && (
+                <div className="mt-4 p-3 bg-slate-700/30 rounded-md">
+                    <h4 className="font-medium text-slate-200">Предпросмотр сгенерированной предыстории:</h4>
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{backstory.substring(0,250)}...</p>
+                </div>
+             )}
+          </SectionPanel>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <button
+                onClick={handleSaveCharacter}
+                className="w-full px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!selectedRace || attributeBuyPoints < 0 || modificationPoints < 0 || (selectedSkills.length !== MAX_SKILL_PROFICIENCIES && MAX_SKILL_PROFICIENCIES > 0)}
+                aria-disabled={!selectedRace || attributeBuyPoints < 0 || modificationPoints < 0 || (selectedSkills.length !== MAX_SKILL_PROFICIENCIES && MAX_SKILL_PROFICIENCIES > 0)}
+              >
+                Создать Персонажа (Сохранить в Файл)
+            </button>
+             <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleLoadCharacterFile} 
+                accept=".json" 
+                style={{ display: 'none' }} 
+            />
+            <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150"
+            >
+                Загрузить Персонажа (из Файла)
+            </button>
+          </div>
+
+        </div>
+      ) : (
+        <div className="w-full max-w-3xl">
+          <CharacterSummary character={currentCharacter} derivedStats={derivedStats} />
+          <button
+            onClick={resetCreator}
+            className="w-full px-6 py-3 mt-8 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150"
+          >
+            Создать Еще Одну Потерянную Душу
+          </button>
+        </div>
+      )}
+      <footer className="mt-12 text-center text-sm text-slate-500">
+        <p>&copy; {new Date().getFullYear()} Генезис Диких Земель. Вдохновлено Бессмертным Преподобным.</p>
+        <p>Это фанатский инструмент. Все права на "Бессмертный Преподобный" принадлежат его автору. Концепции D&D являются собственностью Wizards of the Coast.</p>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
