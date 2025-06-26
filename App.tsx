@@ -19,7 +19,6 @@ import DropdownSelect from './components/DropdownSelect';
 import AttributeEditor from './components/AttributeEditor';
 import TraitsAndItemsDisplay from './components/TraitsAndItemsDisplay';
 import CharacterSummary from './components/CharacterSummary';
-import GeminiFeature from './components/GeminiFeature';
 import ApertureDisplay from './components/ApertureDisplay'; 
 import CharacterStatusPanel from './components/CharacterStatusPanel';
 import HitDieTypeEditor from './components/HitDieTypeEditor';
@@ -1323,16 +1322,6 @@ const App = (): JSX.Element => {
                     <p><strong>Эффект:</strong> {selectedMadness.description}</p>
                 </div>
               )}
-          </SectionPanel>
-
-          <SectionPanel title="Хроника от ИИ (Опционально)">
-             <GeminiFeature character={currentCharacter} onBackstoryGenerated={handleBackstoryGenerated} />
-             {backstory && (
-                <div className="mt-4 p-3 bg-slate-700/30 rounded-md">
-                    <h4 className="font-medium text-slate-200">Предпросмотр сгенерированной предыстории:</h4>
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{backstory.substring(0,250)}...</p>
-                </div>
-             )}
           </SectionPanel>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
