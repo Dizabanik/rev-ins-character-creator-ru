@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Character, Attributes, DndAttribute, Trait, StartingItem, MadnessEffect, Skill, Feat, Race, EssenceStageId, ArmorTypeForSleep, CharacterSaveData, EquipmentSlots, InventoryItem, EquipmentSlotId } from './types';
 import {
@@ -23,6 +22,7 @@ import ApertureDisplay from './components/ApertureDisplay';
 import CharacterStatusPanel from './components/CharacterStatusPanel';
 import HitDieTypeEditor from './components/HitDieTypeEditor';
 import Inventory from './components/Inventory';
+import AddCustomItemModal from './components/AddCustomItemModal';
 
 
 type MadnessOption = Omit<MadnessEffect, 'type'> & { type: MadnessEffect['type'] | 'none' };
@@ -94,6 +94,9 @@ const App = (): JSX.Element => {
   // Inventory State
   const [equipment, setEquipment] = useState<EquipmentSlots>({});
   const [backpack, setBackpack] = useState<InventoryItem[]>([]);
+  const [customItems, setCustomItems] = useState<StartingItem[]>([]);
+  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+
 
   // Aperture State
   const defaultApertureGrade = APERTURE_GRADES[1]; 
@@ -191,56 +194,60 @@ const App = (): JSX.Element => {
   }, [baseAttributes, selectedTraits, selectedItems, selectedMadness, selectedFlawFeats]); 
 
   // Sync selected items with inventory
-   useEffect(() => {
-    const targetItemIds = new Set(selectedItems.map(i => i.id));
-    const allInventoryItems = [...backpack, ...Object.values(equipment).filter(Boolean) as InventoryItem[]];
+  useEffect(() => {
+      const targetItemIds = new Set(selectedItems.map(i => i.id));
+      const allInventoryItems = [...backpack, ...Object.values(equipment).filter(Boolean) as InventoryItem[]];
 
-    const currentItemCounts = allInventoryItems.reduce((acc, item) => {
-        acc[item.itemId] = (acc[item.itemId] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
+      const instanceIdsToRemove = new Set<string>();
+      for (const invItem of allInventoryItems) {
+          const isCustom = invItem.itemId.startsWith('custom-');
+          if (!isCustom && !targetItemIds.has(invItem.itemId)) {
+              instanceIdsToRemove.add(invItem.instanceId);
+          }
+      }
+      
+      const currentItemCounts = allInventoryItems.reduce((acc, item) => {
+          if (!item.itemId.startsWith('custom-')) {
+            acc[item.itemId] = (acc[item.itemId] || 0) + 1;
+          }
+          return acc;
+      }, {} as Record<string, number>);
 
-    const targetItemCounts = selectedItems.reduce((acc, item) => {
-        acc[item.id] = (acc[item.id] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
+      const itemsToAdd: StartingItem[] = [];
+      for (const selectedItem of selectedItems) {
+          const currentCount = currentItemCounts[selectedItem.id] || 0;
+          const targetCount = selectedItems.filter(i => i.id === selectedItem.id).length;
+          if (currentCount < targetCount) {
+              itemsToAdd.push(selectedItem);
+          }
+      }
+      
+      if (instanceIdsToRemove.size === 0 && itemsToAdd.length === 0) {
+          return;
+      }
 
-    let itemsChanged = false;
-    let newBackpack = [...backpack];
-    let newEquipment = { ...equipment };
+      setBackpack(prev => {
+          const filtered = prev.filter(i => !instanceIdsToRemove.has(i.instanceId));
+          const added = itemsToAdd.map(def => ({
+              itemId: def.id,
+              instanceId: `item-${Date.now()}-${Math.random()}`
+          }));
+          return [...filtered, ...added];
+      });
 
-    // Remove items that are no longer selected
-    for (const item of allInventoryItems) {
-        if (!targetItemIds.has(item.itemId)) {
-            itemsChanged = true;
-            newBackpack = newBackpack.filter(bpItem => bpItem.instanceId !== item.instanceId);
-            for (const slot in newEquipment) {
-                if (newEquipment[slot as EquipmentSlotId]?.instanceId === item.instanceId) {
-                    newEquipment[slot as EquipmentSlotId] = null;
-                }
-            }
-        }
-    }
+      setEquipment(prev => {
+          const newEquipment = {...prev};
+          let changed = false;
+          for (const slot in newEquipment) {
+              const s = slot as EquipmentSlotId;
+              if (newEquipment[s] && instanceIdsToRemove.has(newEquipment[s]!.instanceId)) {
+                  newEquipment[s] = null;
+                  changed = true;
+              }
+          }
+          return changed ? newEquipment : prev;
+      });
 
-    // Add newly selected items
-    for (const selectedItem of selectedItems) {
-        const currentCount = currentItemCounts[selectedItem.id] || 0;
-        const targetCount = targetItemCounts[selectedItem.id] || 0;
-        if (currentCount < targetCount) {
-             itemsChanged = true;
-            for (let i = 0; i < targetCount - currentCount; i++) {
-                newBackpack.push({
-                    itemId: selectedItem.id,
-                    instanceId: `item-${Date.now()}-${Math.random()}`
-                });
-            }
-        }
-    }
-    
-    if (itemsChanged) {
-        setBackpack(newBackpack);
-        setEquipment(newEquipment);
-    }
   }, [selectedItems]);
 
 
@@ -485,17 +492,17 @@ const App = (): JSX.Element => {
     setManualAcModifier(value);
   };
   
-  const handleItemDrop = useCallback((data: { instanceId: string, source: EquipmentSlotId | 'backpack' }, targetSlot: EquipmentSlotId | 'backpack') => {
-    // Prevent drop on feet for merman
-    if (selectedRace?.id === 'merman' && targetSlot === 'feet') {
-      return;
-    }
-    
-    // Find the item being moved
-    let itemToMove: InventoryItem | undefined;
-    let newBackpack = [...backpack];
-    let newEquipment = { ...equipment };
+  const allItemsLookup = useMemo(() => {
+    const allItems = [...AVAILABLE_STARTING_ITEMS, ...customItems];
+    return new Map(allItems.map(item => [item.id, item]));
+  }, [customItems]);
 
+  const handleItemDrop = useCallback((data: { instanceId: string; source: EquipmentSlotId | 'backpack' }, targetSlot: EquipmentSlotId | 'backpack') => {
+    let newEquipment = { ...equipment };
+    let newBackpack = [...backpack];
+
+    // Find item being moved
+    let itemToMove: InventoryItem | null = null;
     if (data.source === 'backpack') {
         const itemIndex = newBackpack.findIndex(i => i.instanceId === data.instanceId);
         if (itemIndex > -1) {
@@ -503,27 +510,65 @@ const App = (): JSX.Element => {
             newBackpack.splice(itemIndex, 1);
         }
     } else {
-        itemToMove = newEquipment[data.source] ?? undefined;
+        itemToMove = newEquipment[data.source] ?? null;
         newEquipment[data.source] = null;
     }
+    if (!itemToMove) return;
 
-    if (!itemToMove) return; // Should not happen
+    const movedItemDef = allItemsLookup.get(itemToMove.itemId);
+    const isTwoHanded = movedItemDef?.compatibleSlots?.includes('mainHand') && !movedItemDef.compatibleSlots.includes('offHand');
 
-    // Place item in new location
+    // --- Pre-drop validation ---
+    if (selectedRace?.id === 'merman' && targetSlot === 'feet') return; 
+
+    const mainHandItem = newEquipment.mainHand;
+    if (mainHandItem) {
+        const mainHandDef = allItemsLookup.get(mainHandItem.itemId);
+        const mainHandIsTwoHanded = mainHandDef?.compatibleSlots?.includes('mainHand') && !mainHandDef.compatibleSlots.includes('offHand');
+        if (mainHandIsTwoHanded && targetSlot === 'offHand') {
+            return;
+        }
+    }
+
+    // --- Execute drop ---
     if (targetSlot === 'backpack') {
         newBackpack.push(itemToMove);
     } else {
-        // If there's an item in the target slot, move it to backpack
         const existingItemInTarget = newEquipment[targetSlot];
         if (existingItemInTarget) {
             newBackpack.push(existingItemInTarget);
         }
         newEquipment[targetSlot] = itemToMove;
     }
+    
+    if (targetSlot === 'mainHand' && isTwoHanded) {
+        const offHandItem = newEquipment.offHand;
+        if (offHandItem) {
+            newBackpack.push(offHandItem);
+            newEquipment.offHand = null;
+        }
+    }
 
     setBackpack(newBackpack);
     setEquipment(newEquipment);
-  }, [backpack, equipment, selectedRace]);
+  }, [backpack, equipment, selectedRace, allItemsLookup]);
+
+
+  const handleCreateCustomItem = useCallback((itemData: Omit<StartingItem, 'id' | 'modificationPointCost'>) => {
+      const newItem: StartingItem = {
+          ...itemData,
+          id: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          modificationPointCost: 0,
+      };
+      setCustomItems(prev => [...prev, newItem]);
+
+      const newItemInstance: InventoryItem = {
+          itemId: newItem.id,
+          instanceId: `inst-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      };
+      setBackpack(prev => [...prev, newItemInstance]);
+      setIsAddItemModalOpen(false);
+  }, []);
 
 
   useEffect(() => {
@@ -548,7 +593,8 @@ const App = (): JSX.Element => {
     
     // Calculate AC from equipment
     let acFromEquipment = 0;
-    const equippedArmor = equipment.armor ? AVAILABLE_STARTING_ITEMS.find(i => i.id === equipment.armor?.itemId) : null;
+    const allItemDefs = [...AVAILABLE_STARTING_ITEMS, ...customItems];
+    const equippedArmor = equipment.armor ? allItemDefs.find(i => i.id === equipment.armor?.itemId) : null;
     if (equippedArmor?.id === 'item_leather_armor') {
         acFromEquipment = 1; // +1 from leather armor
     }
@@ -597,7 +643,7 @@ const App = (): JSX.Element => {
     });
 
     setDerivedStats(newDerivedStats);
-  }, [baseAttributes, finalAttributes, selectedRace, selectedTraits, selectedSkills, activeFeats, selectedFlawFeats, characterLevel, currentProficiencyBonus, currentHp, maxHp, currentHitDice, maxHitDice, hitDieType, exhaustionLevel, conSavesProficiency, manualMaxHpModifier, manualAcModifier, equipment]);
+  }, [baseAttributes, finalAttributes, selectedRace, selectedTraits, selectedSkills, activeFeats, selectedFlawFeats, characterLevel, currentProficiencyBonus, currentHp, maxHp, currentHitDice, hitDieType, exhaustionLevel, conSavesProficiency, manualMaxHpModifier, manualAcModifier, equipment, customItems]);
 
 
   const currentCharacter: Character = {
@@ -643,6 +689,7 @@ const App = (): JSX.Element => {
     manualAcModifier,
     equipment,
     backpack,
+    customItems,
   };
 
   const handleSaveCharacter = () => {
@@ -689,6 +736,7 @@ const App = (): JSX.Element => {
         manualAcModifier: manualAcModifier,
         equipment: equipment,
         backpack: backpack,
+        customItems: customItems,
     };
 
     const jsonData = JSON.stringify(characterToSave, null, 2);
@@ -768,6 +816,7 @@ const App = (): JSX.Element => {
             
             setEquipment(loadedData.equipment || {});
             setBackpack(loadedData.backpack || []);
+            setCustomItems(loadedData.customItems || []);
 
             setSelectedApertureGradeId(loadedData.apertureGradeId || defaultApertureGrade.id);
             setSelectedCharacterRankId(loadedData.characterRankId || CHARACTER_RANKS[0].id);
@@ -827,6 +876,7 @@ const App = (): JSX.Element => {
     
     setEquipment({});
     setBackpack([]);
+    setCustomItems([]);
 
     const initialGrade = APERTURE_GRADES[1]; 
     setSelectedApertureGradeId(initialGrade.id);
@@ -869,6 +919,12 @@ const App = (): JSX.Element => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200 p-4 md:p-8 flex flex-col items-center">
+      {isAddItemModalOpen && (
+        <AddCustomItemModal 
+          onClose={() => setIsAddItemModalOpen(false)}
+          onCreate={handleCreateCustomItem}
+        />
+      )}
       <header className="mb-10 text-center">
         <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-500 tracking-tight">Создание Персонажа</h1>
         <p className="text-xl text-zinc-400 mt-2">Потерянная Душа в Мире Гу</p>
@@ -1005,6 +1061,7 @@ const App = (): JSX.Element => {
                 equipment={equipment}
                 backpack={backpack}
                 onItemDrop={handleItemDrop}
+                onCreateCustomItem={() => setIsAddItemModalOpen(true)}
             />
         </SectionPanel>
         
@@ -1062,6 +1119,9 @@ const App = (): JSX.Element => {
                   )}
                   {selectedRace.attributeModifiers && Object.keys(selectedRace.attributeModifiers).length > 0 && (
                     <p><strong className="text-zinc-300">Моды Характеристик:</strong> {Object.entries(selectedRace.attributeModifiers).map(([attr, mod]) => `${DND_ATTRIBUTE_NAMES_RU[attr as DndAttribute]}: ${mod! > 0 ? '+' : ''}${mod}`).join(', ')}</p>
+                  )}
+                  {selectedRace.skillModifiers && Object.keys(selectedRace.skillModifiers).length > 0 && (
+                    <p><strong className="text-zinc-300">Моды Навыков:</strong> {Object.entries(selectedRace.skillModifiers).map(([skillId, mod]) => `${AVAILABLE_SKILLS.find(s => s.id === skillId)?.name || skillId}: ${mod > 0 ? '+' : ''}${mod}`).join(', ')}</p>
                   )}
                 </div>
               </div>
@@ -1246,6 +1306,11 @@ const App = (): JSX.Element => {
                                 ).join(', ')}
                                 {!isStatRequirementMet && <span className="text-rose-500 ml-1">(Неактивно)</span>}
                             </p>
+                            )}
+                            {canBeManuallyChosenFlaw && feat.modificationPointAdjustment && feat.modificationPointAdjustment > 0 && (
+                              <p className="text-sm mt-2 font-semibold text-emerald-400">
+                                  Дает Очков Модификации: +{feat.modificationPointAdjustment}
+                              </p>
                             )}
                         </div>
                         {canBeManuallyChosenFlaw && (

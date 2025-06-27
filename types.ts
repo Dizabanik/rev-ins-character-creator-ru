@@ -65,6 +65,7 @@ export interface Character {
   // Inventory
   equipment: EquipmentSlots;
   backpack: InventoryItem[];
+  customItems: StartingItem[];
 }
 
 export type ArmorTypeForSleep = 'none' | 'light' | 'medium' | 'heavy';
@@ -112,6 +113,7 @@ export interface StartingItem {
   description: string;
   modificationPointCost: number;
   compatibleSlots?: EquipmentSlotId[];
+  weight?: number;
 }
 
 export interface Skill {
@@ -252,4 +254,5 @@ export interface CharacterSaveData {
   // Inventory
   equipment: EquipmentSlots;
   backpack: InventoryItem[];
+  customItems: StartingItem[];
 }

@@ -1,6 +1,7 @@
 
 
-import React, { useState, useCallback } from 'react';
+
+import React, { useState, useCallback, useMemo } from 'react';
 import { EquipmentSlots, InventoryItem, StartingItem, EquipmentSlotId, Character } from '../types';
 import { 
     AVAILABLE_STARTING_ITEMS, 
@@ -8,8 +9,9 @@ import {
     EQUIPMENT_SLOT_NAMES_RU,
     HeadSlotIcon, ChestSlotIcon, LegsSlotIcon, FeetSlotIcon, HandsSlotIcon, 
     WeaponSlotIcon, RingSlotIcon, AmuletSlotIcon, ShoulderBagIcon, 
-    BackpackIcon, UnderwearSlotIcon, BraceletSlotIcon, PouchSlotIcon
+    BackpackIcon, UnderwearSlotIcon, BraceletSlotIcon, PouchSlotIcon, PlusIcon
 } from '../constants';
+import AddCustomItemModal from './AddCustomItemModal';
 
 interface ItemTooltipInfo {
   item: StartingItem;
@@ -22,10 +24,11 @@ interface InventoryProps {
   equipment: EquipmentSlots;
   backpack: InventoryItem[];
   onItemDrop: (data: { instanceId: string; source: EquipmentSlotId | 'backpack' }, targetSlot: EquipmentSlotId | 'backpack') => void;
+  onCreateCustomItem: () => void;
 }
 
 const CharacterBodySvg: React.FC = () => (
-    <svg viewBox="0 0 150 250" className="absolute inset-0 w-full h-full object-contain text-slate-600/80" style={{ transform: 'translateY(1%)' }}>
+    <svg viewBox="0 0 150 250" className="absolute inset-0 w-full h-full object-contain text-zinc-800" style={{ transform: 'translateY(1%)' }}>
         <g fill="currentColor" stroke="none">
             {/* Head */}
             <circle cx="75" cy="25" r="18" />
@@ -79,8 +82,6 @@ const slotPositions: Record<EquipmentSlotId, string> = {
     leg_pouch_R: 'top-[85%] right-[28%]',
 };
 
-const itemLookup = new Map(AVAILABLE_STARTING_ITEMS.map(item => [item.id, item]));
-
 const slotIcons: Record<EquipmentSlotId, React.FC<{className?: string}>> = {
     head: HeadSlotIcon,
     armor: ChestSlotIcon,
@@ -114,18 +115,24 @@ const ItemTooltip: React.FC<{ tooltipInfo: ItemTooltipInfo | null }> = ({ toolti
 
   return (
     <div
-      className="fixed z-50 p-3 bg-slate-900/90 backdrop-blur-sm border border-red-500 rounded-lg shadow-xl max-w-xs text-sm"
+      className="fixed z-50 p-3 bg-zinc-950/80 backdrop-blur-sm border border-indigo-500 rounded-lg shadow-xl max-w-xs text-sm"
       style={{ left: tooltipInfo.x + 15, top: tooltipInfo.y + 15 }}
     >
-      <h4 className="font-bold text-red-400">{tooltipInfo.item.name}</h4>
-      <p className="text-slate-300">{tooltipInfo.item.description}</p>
+      <h4 className="font-bold text-indigo-400">{tooltipInfo.item.name}</h4>
+      <p className="text-zinc-300">{tooltipInfo.item.description}</p>
+      {tooltipInfo.item.weight !== undefined && <p className="text-xs text-zinc-400 mt-1">Вес: {tooltipInfo.item.weight}</p>}
     </div>
   );
 };
 
-const Inventory: React.FC<InventoryProps> = ({ character, equipment, backpack, onItemDrop }) => {
+const Inventory: React.FC<InventoryProps> = ({ character, equipment, backpack, onItemDrop, onCreateCustomItem }) => {
     const [tooltipInfo, setTooltipInfo] = useState<ItemTooltipInfo | null>(null);
     const [draggedItemCompatibleSlots, setDraggedItemCompatibleSlots] = useState<EquipmentSlotId[]>([]);
+
+    const itemLookup = useMemo(() => {
+        const allItems = [...AVAILABLE_STARTING_ITEMS, ...(character.customItems || [])];
+        return new Map(allItems.map(item => [item.id, item]));
+    }, [character.customItems]);
     
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, instanceId: string, source: EquipmentSlotId | 'backpack') => {
         const itemInstance = source === 'backpack' ? backpack.find(i => i.instanceId === instanceId) : equipment[source];
@@ -149,9 +156,7 @@ const Inventory: React.FC<InventoryProps> = ({ character, equipment, backpack, o
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetSlot: EquipmentSlotId | 'backpack') => {
         e.preventDefault();
         setDraggedItemCompatibleSlots([]);
-        if (character.selectedRace?.id === 'merman' && targetSlot === 'feet') {
-            return; // Prevent dropping on disabled slot
-        }
+        
         try {
             const data = JSON.parse(e.dataTransfer.getData('application/json'));
             if (data.instanceId && data.source) {
@@ -194,7 +199,7 @@ const Inventory: React.FC<InventoryProps> = ({ character, equipment, backpack, o
                 onDragStart={(e) => handleDragStart(e, itemInstance.instanceId, source)}
                 onDragEnd={handleDragEnd}
                 onContextMenu={(e) => handleContextMenu(e, itemInstance)}
-                className="w-full h-full bg-slate-700 border-2 border-slate-500 rounded-md flex items-center justify-center cursor-move p-1 text-center text-[10px] leading-tight text-red-300 font-semibold shadow-inner hover:border-red-400 transition-colors"
+                className="w-full h-full bg-zinc-700/80 border-2 border-zinc-600 rounded-lg flex items-center justify-center cursor-move p-1 text-center text-[10px] leading-tight text-zinc-100 font-semibold shadow-inner hover:border-indigo-400 transition-colors"
                 title={item.name}
             >
                 {item.name}
@@ -206,22 +211,33 @@ const Inventory: React.FC<InventoryProps> = ({ character, equipment, backpack, o
         const itemInstance = equipment[slotId];
         const isCompatible = draggedItemCompatibleSlots.includes(slotId);
         const SlotIcon = slotIcons[slotId];
-        const isDisabled = character.selectedRace?.id === 'merman' && slotId === 'feet';
+        
+        const mainHandItemInstance = equipment.mainHand;
+        const mainHandItemDef = mainHandItemInstance ? itemLookup.get(mainHandItemInstance.itemId) : null;
+        const mainHandIsTwoHanded = !!(mainHandItemDef?.compatibleSlots?.includes('mainHand') && !mainHandItemDef.compatibleSlots.includes('offHand'));
+
+        const isDisabledByRace = character.selectedRace?.id === 'merman' && slotId === 'feet';
+        const isBlockedByWeapon = slotId === 'offHand' && mainHandIsTwoHanded;
+        const isDisabled = isDisabledByRace || isBlockedByWeapon;
+
+        let disabledTitle = '';
+        if (isDisabledByRace) disabledTitle = ' (Заблокировано для Мерфолка)';
+        if (isBlockedByWeapon) disabledTitle = ' (Заблокировано двуручным оружием)';
 
         return (
             <div
                 key={slotId}
                 onDragOver={isDisabled ? undefined : handleDragOver}
                 onDrop={isDisabled ? undefined : (e) => handleDrop(e, slotId)}
-                className={`absolute w-12 h-12 bg-slate-800/50 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center transition-colors ${slotPositions[slotId]} ${
-                    isCompatible && !isDisabled ? 'border-green-500 bg-green-800/30 ring-2 ring-green-400' : ''
+                className={`absolute w-12 h-12 bg-zinc-900/50 border-2 border-dashed border-zinc-700 rounded-lg flex items-center justify-center transition-all duration-150 ${slotPositions[slotId]} ${
+                    isCompatible && !isDisabled ? 'border-indigo-500 bg-indigo-900/50 ring-2 ring-indigo-400' : ''
                 } ${
-                    isDisabled ? 'opacity-40 cursor-not-allowed bg-red-900/50 border-red-700' : 'hover:border-red-500'
+                    isDisabled ? 'opacity-40 cursor-not-allowed bg-rose-900/50 border-rose-800' : 'hover:border-indigo-500'
                 }`}
-                title={EQUIPMENT_SLOT_NAMES_RU[slotId] + (isDisabled ? ' (Заблокировано для Мерфолка)' : '')}
+                title={EQUIPMENT_SLOT_NAMES_RU[slotId] + disabledTitle}
             >
                 {itemInstance ? renderItem(itemInstance, slotId) : (
-                    <SlotIcon className="w-7 h-7 text-slate-600" />
+                    <SlotIcon className="w-7 h-7 text-zinc-600" />
                 )}
             </div>
         );
@@ -239,19 +255,28 @@ const Inventory: React.FC<InventoryProps> = ({ character, equipment, backpack, o
 
         {/* Backpack */}
         <div className="flex-grow">
-          <h4 className="text-lg font-semibold text-red-300 mb-2 flex items-center">
-            <BackpackIcon className="mr-2"/> Рюкзак
-          </h4>
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="text-lg font-semibold text-zinc-200 flex items-center">
+                <BackpackIcon className="mr-2"/> Рюкзак
+            </h4>
+            <button
+                onClick={onCreateCustomItem} 
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600/50 hover:bg-indigo-600/80 text-indigo-200 font-semibold rounded-lg text-sm transition-colors"
+            >
+                <PlusIcon />
+                Добавить свой предмет
+            </button>
+          </div>
           <div
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, 'backpack')}
-            className="w-full min-h-48 p-3 bg-slate-800/50 border-2 border-dashed border-slate-600 rounded-lg flex flex-wrap gap-2 content-start"
+            className="w-full min-h-48 p-3 bg-zinc-800/50 border-2 border-dashed border-zinc-700 rounded-2xl flex flex-wrap gap-2 content-start"
           >
             {backpack.length > 0 ? (
-                backpack.map(item => <div key={item.instanceId} className="w-12 h-12">{renderItem(item, 'backpack')}</div>)
+                backpack.map(item => <div key={item.instanceId} className="w-14 h-14">{renderItem(item, 'backpack')}</div>)
             ) : (
-                <div className="w-full text-center text-slate-500 italic p-4">
-                    Рюкзак пуст. Выберите стартовые предметы, чтобы они появились здесь.
+                <div className="w-full text-center text-zinc-500 italic p-4">
+                    Рюкзак пуст.
                 </div>
             )}
           </div>

@@ -68,7 +68,7 @@ const ApertureDisplay: React.FC<ApertureDisplayProps> = ({
                   style={{
                       height: `${fillPercentage}%`,
                       backgroundColor: essenceColor,
-                      boxShadow: `0 0 45px 20px ${essenceColor}`,
+                      boxShadow: `0 0 30px 15px ${essenceColor}`,
                   }}
               ></div>
               {/* Glassy overlay/glare */}
