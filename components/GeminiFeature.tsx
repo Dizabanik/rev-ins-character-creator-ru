@@ -32,16 +32,16 @@ const GeminiFeature: React.FC<GeminiFeatureProps> = ({ character, onBackstoryGen
       <button
         onClick={handleGenerateBackstory}
         disabled={isLoading || !process.env.API_KEY}
-        className="w-full flex items-center justify-center px-6 py-3 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white font-semibold rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 ease-in-out"
+        className="w-full flex items-center justify-center px-6 py-4 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-semibold rounded-2xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:ring-indigo-500"
       >
         <SparklesIcon />
         {isLoading ? "Создание вашей легенды..." : "Сгенерировать предысторию с ИИ"}
       </button>
       {!process.env.API_KEY && (
-         <p className="text-xs text-yellow-400 mt-2 text-center">API ключ не настроен. Функции ИИ отключены.</p>
+         <p className="text-xs text-amber-500 mt-3 text-center">API ключ не настроен. Функции ИИ отключены.</p>
       )}
       {isLoading && <LoadingSpinner />}
-      {error && <p className="text-red-400 mt-2 text-sm">{error}</p>}
+      {error && <p className="text-rose-400 mt-2 text-sm text-center">{error}</p>}
     </div>
   );
 };

@@ -1,8 +1,7 @@
 
 
 
-
-import React from 'react';
+import React, { CSSProperties } from 'react';
 import { DndAttribute, MadnessEffect, Trait, StartingItem, Skill, Feat, Race, ApertureGradeInfo, CharacterRankInfoNew, EssenceStageId, EssenceStageDetail, ArmorTypeForSleep, EquipmentSlotId } from './types'; // Updated CharacterRankInfoNew
 
 export const DND_ATTRIBUTES_KEYS: DndAttribute[] = [
@@ -182,13 +181,15 @@ export const AVAILABLE_STARTING_ITEMS: StartingItem[] = [
   { id: "item_pouch_coins", name: "Мешочек с 10 золотыми монетами", description: "Немного валюты из вашего старого мира, здесь может быть бесполезна.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'] },
   
   // --- Equippable Items ---
-  { id: "item_leather_armor", name: "Кожаная броня", description: "Простая броня из дубленой кожи. Дает +1 к КБ.", modificationPointCost: 2, compatibleSlots: ['armor'] },
+  { id: "item_simple_shirt", name: "Простая рубаха", description: "Обычная рубаха из грубой ткани.", modificationPointCost: 1, compatibleSlots: ['underwear'] },
+  { id: "item_leather_armor", name: "Кожаная броня", description: "Простая броня из дубленой кожи. Дает +1 к КБ.", modificationPointCost: 3, compatibleSlots: ['armor'] },
   { id: "item_simple_helmet", name: "Простой шлем", description: "Базовая защита для головы.", modificationPointCost: 1, compatibleSlots: ['head'] },
   { id: "item_sturdy_boots", name: "Крепкие сапоги", description: "Защищают ноги от острых камней и пересеченной местности.", modificationPointCost: 1, compatibleSlots: ['feet'] },
+  { id: "item_cloth_trousers", name: "Тканевые штаны", description: "Простые, но прочные штаны.", modificationPointCost: 1, compatibleSlots: ['legs'] },
   { id: "item_leather_gloves", name: "Кожаные перчатки", description: "Защищают руки и улучшают хват.", modificationPointCost: 1, compatibleSlots: ['hands_L', 'hands_R'] },
-  { id: "item_wool_cloak", name: "Шерстяной плащ", description: "Плащ, который защищает от непогоды.", modificationPointCost: 1, compatibleSlots: ['shoulder_L'] },
+  { id: "item_wool_cloak", name: "Шерстяной плащ", description: "Плащ, который защищает от непогоды.", modificationPointCost: 2, compatibleSlots: ['shoulder_L'] },
   { id: "item_simple_bag", name: "Простая сумка", description: "Небольшая сумка через плечо для мелочей.", modificationPointCost: 1, compatibleSlots: ['shoulder_L', 'shoulder_R'] },
-  { id: "item_short_sword", name: "Короткий меч", description: "Надежный короткий меч. Режущее оружие.", modificationPointCost: 2, compatibleSlots: ['mainHand', 'offHand', 'leg_weapon_L', 'leg_weapon_R'] },
+  { id: "item_short_sword", name: "Короткий меч", description: "Надежный короткий меч. Режущее оружие.", modificationPointCost: 3, compatibleSlots: ['mainHand', 'offHand', 'leg_weapon_L', 'leg_weapon_R'] },
   { id: "item_wooden_ring", name: "Деревянное кольцо", description: "Простое кольцо из дерева. Возможно, имеет сентиментальную ценность.", modificationPointCost: 0, compatibleSlots: ['ring_L1', 'ring_L2', 'ring_L3', 'ring_R1', 'ring_R2', 'ring_R3'] },
   { id: "item_leather_bracelet", name: "Кожаный браслет", description: "Простой браслет из кожи.", modificationPointCost: 0, compatibleSlots: ['bracelet_L', 'bracelet_R'] },
   { id: "item_string_amulet", name: "Амулет на веревке", description: "Простой камень, висящий на веревке.", modificationPointCost: 0, compatibleSlots: ['amulet', 'amulet2'] },
@@ -806,14 +807,14 @@ export const ListBulletIcon: React.FC<{ className?: string }> = ({ className }) 
   </svg>
 );
 
-export const StarIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={'w-5 h-5 ' + (className || '')}>
+export const StarIcon: React.FC<{ className?: string, style?: CSSProperties }> = ({ className, style }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={'w-5 h-5 ' + (className || '')} style={style}>
     <path fillRule="evenodd" d="M10.868 2.884c.321-.772 1.415-.772 1.736 0l1.83 4.401 4.753.392c.83.069 1.171 1.076.536 1.654l-3.616 3.14.922 4.672c.152.768-.669 1.36-1.33.976l-4.132-2.417-4.132 2.417c-.66.384-1.482-.208-1.33-.976l.922-4.672L.092 9.33c-.635-.578-.294-1.585.536-1.654l4.753-.392 1.83-4.401Z" clipRule="evenodd" />
   </svg>
 );
 
-export const BeakerIcon: React.FC<{className?: string}> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={'w-6 h-6 ' + (className || '')}>
+export const BeakerIcon: React.FC<{className?: string, style?: CSSProperties}> = ({ className, style }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={'w-6 h-6 ' + (className || '')} style={style}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 8.25v-4.5m0 4.5h-4.5m4.5 0L21 12m-6.75-3.75L3 12m8.25 8.25v6M6 16.5h12M6 16.5H3.75m2.25 0V12m2.25 4.5V12m0 0V9.75m5.25 2.25V12m2.25 4.5V12m0 0V9.75M9 16.5v3.75m6-3.75v3.75" />
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h18M3 21h18" /> 
   </svg>
@@ -897,35 +898,35 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
   if (apertureMaxMatch) {
     return {
       label: "Макс. Эссенция", value: apertureMaxMatch[1], suffix: "% (" + apertureMaxMatch[2].trim() + ")",
-      IconComponent: BeakerIcon, valueColor: 'text-cyan-300', iconColor: 'text-cyan-400', isNumeric: true, isApertureInfo: true,
+      IconComponent: BeakerIcon, valueColor: 'text-cyan-400', iconColor: 'text-cyan-400', isNumeric: true, isApertureInfo: true,
     };
   }
   const apertureRegenMatch = statString.match(/^Регенерация Эссенции:\s*(.*?)$/);
    if (apertureRegenMatch) {
     return {
       label: "Регенерация Эссенции", value: apertureRegenMatch[1].trim(), suffix: "",
-      IconComponent: BoltIcon, valueColor: 'text-lime-300', iconColor: 'text-lime-400', isNumeric: false, isApertureInfo: true,
+      IconComponent: BoltIcon, valueColor: 'text-emerald-400', iconColor: 'text-emerald-400', isNumeric: false, isApertureInfo: true,
     };
   }
   const apertureTalentMatch = statString.match(/^Талант Апертуры:\s*(.+)$/);
   if (apertureTalentMatch) {
     return {
       label: "Талант Апертуры", value: apertureTalentMatch[1].trim(), suffix: "",
-      IconComponent: CircleStackIcon, valueColor: 'text-violet-300', iconColor: 'text-violet-400', isNumeric: false, isApertureInfo: true,
+      IconComponent: CircleStackIcon, valueColor: 'text-violet-400', iconColor: 'text-violet-400', isNumeric: false, isApertureInfo: true,
     };
   }
   const apertureRankMatch = statString.match(/^Ранг Мастера Гу:\s*(.+)$/);
   if (apertureRankMatch) {
     return {
       label: "Ранг Мастера Гу", value: apertureRankMatch[1].trim(), suffix: "",
-      IconComponent: UserCircleIcon, valueColor: 'text-amber-300', iconColor: 'text-amber-400', isNumeric: false, isApertureInfo: true,
+      IconComponent: UserCircleIcon, valueColor: 'text-amber-400', iconColor: 'text-amber-400', isNumeric: false, isApertureInfo: true,
     };
   }
   const hpMatch = statString.match(/^(Хитпоинты|HP):\s*(\d+)\s*\/\s*(\d+)\s*$/);
   if (hpMatch) {
     return {
         label: "Хитпоинты", value: `${hpMatch[2]} / ${hpMatch[3]}`, suffix: "",
-        IconComponent: HeartIcon, valueColor: 'text-red-400', iconColor: 'text-red-500', 
+        IconComponent: HeartIcon, valueColor: 'text-rose-400', iconColor: 'text-rose-500', 
         isNumeric: false, // It's a string "X / Y"
         isHpInfo: true,
     };
@@ -934,7 +935,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
     if (hdMatch) {
         return {
             label: `Кости Хитов`, value: `${hdMatch[2]} / ${hdMatch[3]}`, suffix: `(d${hdMatch[4]})`, // Suffix now only contains die type
-            IconComponent: DiceIcon, valueColor: 'text-green-400', iconColor: 'text-green-500', 
+            IconComponent: DiceIcon, valueColor: 'text-emerald-400', iconColor: 'text-emerald-500', 
             isNumeric: false, // It's a string "X / Y"
             isHpInfo: true,
             isHitDieInfo: true,
@@ -945,7 +946,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
   if (exhaustionMatch) {
     return {
         label: "Истощение", value: exhaustionMatch[1], suffix: exhaustionMatch[2].trim(),
-        IconComponent: ShieldExclamationIcon, valueColor: parseInt(exhaustionMatch[1]) > 0 ? 'text-yellow-400' : 'text-slate-300', iconColor: 'text-yellow-500', 
+        IconComponent: ShieldExclamationIcon, valueColor: parseInt(exhaustionMatch[1]) > 0 ? 'text-amber-400' : 'text-zinc-300', iconColor: 'text-amber-500', 
         isNumeric: true, 
         isHpInfo: true,
     };
@@ -972,27 +973,27 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
     let value = numericMatch[2].trim();
     let suffix = numericMatch[3].trim();
     let IconComponent: React.FC<{ className?: string }> | null = null;
-    let valueColor = 'text-slate-100'; 
-    let iconColor = 'text-red-400';   
+    let valueColor = 'text-zinc-100'; 
+    let iconColor = 'text-indigo-400';   
 
     if (label.startsWith("Класс Брони (КБ)")) {
-      IconComponent = ArmorClassIcon; valueColor = "text-blue-400"; iconColor = "text-blue-400";
+      IconComponent = ArmorClassIcon; valueColor = "text-sky-400"; iconColor = "text-sky-400";
     } else if (label.startsWith(SAVING_THROW_NAMES_RU.strength)) {
-      IconComponent = CubeIcon; valueColor = "text-purple-400"; iconColor = "text-purple-400";
+      IconComponent = CubeIcon; valueColor = "text-violet-400"; iconColor = "text-violet-400";
     } else if (label.startsWith(SAVING_THROW_NAMES_RU.dexterity)) {
-      IconComponent = ArrowsPointingOutIcon; valueColor = "text-purple-400"; iconColor = "text-purple-400";
+      IconComponent = ArrowsPointingOutIcon; valueColor = "text-violet-400"; iconColor = "text-violet-400";
     } else if (label.startsWith(SAVING_THROW_NAMES_RU.constitution)) {
-      IconComponent = Battery100Icon; valueColor = "text-purple-400"; iconColor = "text-purple-400";
+      IconComponent = Battery100Icon; valueColor = "text-violet-400"; iconColor = "text-violet-400";
     } else if (label.startsWith(SAVING_THROW_NAMES_RU.intelligence)) {
-      IconComponent = AcademicCapIcon; valueColor = "text-purple-400"; iconColor = "text-purple-400";
+      IconComponent = AcademicCapIcon; valueColor = "text-violet-400"; iconColor = "text-violet-400";
     } else if (label.startsWith(SAVING_THROW_NAMES_RU.wisdom)) {
-      IconComponent = ScaleIcon; valueColor = "text-purple-400"; iconColor = "text-purple-400";
+      IconComponent = ScaleIcon; valueColor = "text-violet-400"; iconColor = "text-violet-400";
     } else if (label.startsWith(SAVING_THROW_NAMES_RU.charisma)) {
-      IconComponent = ChatBubbleOvalLeftEllipsisIcon; valueColor = "text-purple-400"; iconColor = "text-purple-400";
+      IconComponent = ChatBubbleOvalLeftEllipsisIcon; valueColor = "text-violet-400"; iconColor = "text-violet-400";
     } else if (label.startsWith("Концептуальные ПЗ")) { //This will be replaced by HP
-      IconComponent = HeartIcon; valueColor = "text-green-400"; iconColor = "text-green-400";
+      IconComponent = HeartIcon; valueColor = "text-emerald-400"; iconColor = "text-emerald-400";
     } else if (label.startsWith("Концептуальная Инициатива")) {
-      IconComponent = BoltIcon; valueColor = "text-yellow-400"; iconColor = "text-yellow-400";
+      IconComponent = BoltIcon; valueColor = "text-amber-400"; iconColor = "text-amber-400";
     } else if (label.startsWith("Пассивная Внимательность")) {
       IconComponent = EyeIcon; valueColor = "text-cyan-400"; iconColor = "text-cyan-400";
     } else if (label.startsWith("Скорость")) {
@@ -1000,7 +1001,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
     } else if (label.startsWith("Известные языки")) {
       IconComponent = BookOpenIcon; valueColor = "text-indigo-400"; iconColor = "text-indigo-400";
     } else if (label.startsWith("Бонус Умения")) {
-      IconComponent = StarIcon; valueColor = "text-yellow-300"; iconColor = "text-yellow-400";
+      IconComponent = StarIcon; valueColor = "text-amber-300"; iconColor = "text-amber-400";
     }
     return { label, value, suffix, IconComponent, valueColor, iconColor, isNumeric: true, isSkill: false };
   }
@@ -1008,7 +1009,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
   const textualMatch = statString.match(/^(.*?):\s*(.+)$/);
   if (textualMatch) {
     let icon = InfoIcon;
-    let valColor = 'text-slate-300';
+    let valColor = 'text-zinc-300';
     let icoColor = 'text-sky-400';
 
     return {
@@ -1028,7 +1029,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
     value: '',
     suffix: '',
     IconComponent: InfoIcon,
-    valueColor: 'text-slate-300',
+    valueColor: 'text-zinc-300',
     iconColor: 'text-sky-400',
     isNumeric: false,
     isSkill: false,

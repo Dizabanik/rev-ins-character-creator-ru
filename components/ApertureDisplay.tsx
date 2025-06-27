@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { ApertureGradeInfo, EssenceStageId } from '../types';
+import { ApertureGradeInfo, CharacterRankInfoNew, EssenceStageId } from '../types';
 import { 
     APERTURE_GRADES, CHARACTER_RANKS, ESSENCE_STAGES, getEssenceDetails, 
     CircleStackIcon, UserCircleIcon, BeakerIcon, BoltIcon, StarIcon as StageIcon,
-    getEssenceCondensationDetails, ChevronDownIcon, ChevronUpIcon, CondensationDetailInfo
+    getEssenceCondensationDetails, ChevronDownIcon, ChevronUpIcon
 } from '../constants';
 import DropdownSelect from './DropdownSelect';
 
@@ -33,179 +33,186 @@ const ApertureDisplay: React.FC<ApertureDisplayProps> = ({
   specificMaxEssence,
   onSpecificMaxEssenceChange,
 }) => {
+  
   const [showCondensationDetails, setShowCondensationDetails] = useState(false);
 
-  const gradeInfo = APERTURE_GRADES.find(g => g.id === selectedGradeId) || APERTURE_GRADES[0];
-  const rankInfo = CHARACTER_RANKS.find(r => r.id === selectedRankId) || CHARACTER_RANKS[0];
-  const essenceStageDetails = getEssenceDetails(selectedRankId, selectedStageId) || rankInfo.stages[0];
-  const condensationInfo = getEssenceCondensationDetails(selectedRankId, selectedStageId);
+  const selectedGradeInfo = APERTURE_GRADES.find(g => g.id === selectedGradeId);
+  const selectedRankInfo = CHARACTER_RANKS.find(r => r.id === selectedRankId);
+  const selectedEssenceDetails = getEssenceDetails(selectedRankId, selectedStageId);
 
-
-  const handleCurrentEssenceInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = parseInt(e.target.value, 10);
-    if (isNaN(value)) value = 0;
-    onEssenceChange(Math.max(0, Math.min(value, specificMaxEssence)));
-  };
-
-  const handleSpecificMaxEssenceInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = parseInt(e.target.value, 10);
-    if (isNaN(value)) value = gradeInfo.minMaxEssence;
-    onSpecificMaxEssenceChange(Math.max(gradeInfo.minMaxEssence, Math.min(value, gradeInfo.maxMaxEssence)));
-  };
-
-  const essenceFillHeight = specificMaxEssence > 0 ? (currentEssencePercentage / specificMaxEssence) * 100 : 0;
-
+  const condensationInfo = selectedRankInfo && selectedStageId 
+    ? getEssenceCondensationDetails(selectedRankInfo.id, selectedStageId) 
+    : [];
+    
   const formatCondensationFactor = (factor: number): string => {
     if (factor === 1) return "1.00";
-    if (factor > 0 && factor < 0.01) return factor.toExponential(2);
+    if (Math.abs(factor) > 0 && Math.abs(factor) < 0.01 && factor !== 0) return factor.toExponential(2);
     return factor.toFixed(2);
-  }
+  };
+
+  const fillPercentage = specificMaxEssence > 0 ? (currentEssencePercentage / specificMaxEssence) * 100 : 0;
+  const essenceColor = selectedEssenceDetails?.color || 'rgba(100, 116, 139, 0.5)'; // default slate color
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-        <DropdownSelect
-          label="Талант Апертуры (Grade)"
-          value={selectedGradeId}
-          options={APERTURE_GRADES}
-          onChange={onGradeChange}
-          getOptionValue={(option: ApertureGradeInfo) => option.id}
-          getOptionLabel={(option: ApertureGradeInfo) => `${option.name} (Диапазон: ${option.minMaxEssence}-${option.maxMaxEssence}%)`}
-          id="aperture-grade-select"
-        />
-        <DropdownSelect
-          label="Ранг Мастера Гу (Rank)"
-          value={selectedRankId}
-          options={CHARACTER_RANKS}
-          onChange={onRankChange}
-          getOptionValue={(option) => option.id}
-          getOptionLabel={(option) => option.name}
-          id="character-rank-select"
-        />
-        <DropdownSelect
-          label="Стадия Эссенции"
-          value={selectedStageId}
-          options={ESSENCE_STAGES}
-          onChange={(value) => onStageChange(value as EssenceStageId)}
-          getOptionValue={(option) => option.id}
-          getOptionLabel={(option) => option.displayName}
-          id="essence-stage-select"
-        />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 items-center">
+      {/* Column 1: Aperture Visualization */}
+      <div className="relative flex items-center justify-center h-full min-h-[300px] md:min-h-0">
+          <div className="w-56 h-56 rounded-full bg-zinc-900/70 border-4 border-zinc-700/50 relative overflow-hidden flex items-center justify-center shadow-inner"
+              style={{
+                  boxShadow: `inset 0 0 15px rgba(0,0,0,0.5), 0 0 10px ${essenceColor.replace(/,\s*\d\.\d+\)/, ', 0.3)')}`
+              }}
+          >
+              {/* The essence wave */}
+              <div
+                  className="absolute bottom-0 w-full transition-all duration-500 ease-in-out"
+                  style={{
+                      height: `${fillPercentage}%`,
+                      backgroundColor: essenceColor,
+                      boxShadow: `0 0 45px 20px ${essenceColor}`,
+                  }}
+              ></div>
+              {/* Glassy overlay/glare */}
+              <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.1), rgba(255,255,255,0) 70%)' }}></div>
+              {/* Text inside */}
+              <span className="relative text-4xl font-bold text-white/90" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+                  {currentEssencePercentage.toFixed(1)}%
+              </span>
+          </div>
       </div>
 
-      <div className="my-6 flex flex-col items-center">
-        <div 
-          className="w-32 h-32 md:w-40 md:h-40 bg-slate-700 border-4 border-slate-600 rounded-full relative overflow-hidden shadow-inner"
-          aria-label={`Апертура: ${currentEssencePercentage}% из ${specificMaxEssence}%, цвет ${essenceStageDetails.colorName}`}
-        >
-          <div
-            className="absolute bottom-0 left-0 w-full transition-all duration-500 ease-in-out"
-            style={{
-              height: `${essenceFillHeight}%`,
-              backgroundColor: essenceStageDetails.color,
-            }}
-          ></div>
-           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-3xl font-bold text-white opacity-80 tabular-nums" style={{textShadow: '0 0 5px rgba(0,0,0,0.7)'}}>
-              {currentEssencePercentage}%
-            </span>
-          </div>
-        </div>
-        
-        <div className="mt-4 w-full max-w-xs">
-          <label htmlFor="specificMaxEssence" className="block text-sm font-medium text-slate-300 mb-1 text-center">
-            Максимум Эссенции для Таланта ({specificMaxEssence}%)
-          </label>
-          <input
-            type="range"
-            id="specificMaxEssence"
-            min={gradeInfo.minMaxEssence}
-            max={gradeInfo.maxMaxEssence}
-            value={specificMaxEssence}
-            onChange={handleSpecificMaxEssenceInputChange}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
-            disabled={gradeInfo.minMaxEssence === gradeInfo.maxMaxEssence} // Disable for S Grade
+      {/* Column 2: Controls */}
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-4">
+          <DropdownSelect
+            label="Талант Апертуры (Грейд)"
+            value={selectedGradeId}
+            options={APERTURE_GRADES}
+            onChange={onGradeChange}
+            getOptionValue={(g: ApertureGradeInfo) => g.id}
+            getOptionLabel={(g: ApertureGradeInfo) => g.name}
+            id="aperture-grade-select"
           />
-          <div className="flex justify-between text-xs text-slate-400 px-1 mt-1">
-            <span>{gradeInfo.minMaxEssence}%</span>
-            <span>{gradeInfo.maxMaxEssence}%</span>
-          </div>
-        </div>
-
-        <div className="mt-3 w-full max-w-xs">
-          <label htmlFor="currentEssencePercentage" className="block text-sm font-medium text-slate-300 mb-1 text-center">
-            Текущая Первобытная Эссенция ({currentEssencePercentage}%)
-          </label>
-          <input
-            type="range"
-            id="currentEssencePercentage"
-            min="0"
-            max={specificMaxEssence}
-            value={currentEssencePercentage}
-            onChange={handleCurrentEssenceInputChange}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-500"
+          <DropdownSelect
+            label="Ранг Мастера Гу"
+            value={selectedRankId}
+            options={CHARACTER_RANKS}
+            onChange={onRankChange}
+            getOptionValue={(r: CharacterRankInfoNew) => r.id}
+            getOptionLabel={(r: CharacterRankInfoNew) => r.name}
+            id="character-rank-select"
           />
-          <div className="flex justify-between text-xs text-slate-400 px-1 mt-1">
-            <span>0%</span>
-            <span>{specificMaxEssence}%</span>
-          </div>
+          <DropdownSelect
+            label="Стадия Первобытной Эссенции"
+            value={selectedStageId}
+            options={ESSENCE_STAGES}
+            onChange={(val) => onStageChange(val as EssenceStageId)}
+            getOptionValue={(s: {id: EssenceStageId, displayName: string}) => s.id}
+            getOptionLabel={(s: {id: EssenceStageId, displayName: string}) => s.displayName}
+            id="essence-stage-select"
+          />
         </div>
-      </div>
 
-      <div className="p-4 bg-slate-700/30 rounded-md space-y-2 text-sm text-slate-300 shadow">
-        <div className="flex items-center">
-          <CircleStackIcon className="w-5 h-5 mr-2 text-violet-400 flex-shrink-0" />
-          <p><strong>Талант Апертуры:</strong> <span className="text-violet-300">{gradeInfo.name} (Макс. Эссенции: {specificMaxEssence}%)</span></p>
-        </div>
-        <div className="flex items-center">
-          <UserCircleIcon className="w-5 h-5 mr-2 text-amber-400 flex-shrink-0" />
-          <p><strong>Ранг Мастера Гу:</strong> <span className="text-amber-300">{rankInfo.name}</span> ({rankInfo.rankColorGroup})</p>
-        </div>
-        <div className="flex items-center">
-          <StageIcon className="w-5 h-5 mr-2 text-yellow-400 flex-shrink-0" />
-           <p><strong>Стадия Эссенции:</strong> <span className="text-yellow-300">{essenceStageDetails.name}</span></p>
-        </div>
-         <div className="flex items-center">
-          <BeakerIcon className="w-5 h-5 mr-2 text-cyan-400 flex-shrink-0" />
-          <div>
-            <p><strong>Тип Эссенции:</strong> <span style={{color: essenceStageDetails.color.replace(/0\.\d+/, '1')}}>{essenceStageDetails.stageSpecificEssenceName}</span></p>
-            <p><strong>Цвет:</strong> <span style={{color: essenceStageDetails.color.replace(/0\.\d+/, '1')}}>{essenceStageDetails.colorName}</span>, <span className="text-slate-400">Качество: {rankInfo.condensation}</span></p>
-          </div>
-        </div>
-        <div className="flex items-center">
-           <BoltIcon className="w-5 h-5 mr-2 text-lime-400 flex-shrink-0" />
-          <p>
-            <strong>Восстановление:</strong> 
-            <span className="text-lime-300"> ~{(specificMaxEssence / gradeInfo.recoveryTimeHours).toFixed(1)}% в час</span> (полное за ~{gradeInfo.recoveryTimeHours} ч).
-          </p>
-        </div>
-        <p className="text-xs text-slate-500 mt-1">{gradeInfo.description}</p>
-
-        {/* Condensation Details Toggle */}
-        <div className="mt-3 border-t border-slate-600 pt-3">
-            <button 
-                onClick={() => setShowCondensationDetails(!showCondensationDetails)}
-                className="flex items-center justify-between w-full text-sm font-medium text-sky-300 hover:text-sky-200"
-                aria-expanded={showCondensationDetails}
-            >
-                <span>Детали Конденсации Эссенции</span>
-                {showCondensationDetails ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            </button>
-            {showCondensationDetails && condensationInfo.length > 0 && (
-                <div className="mt-2 space-y-1 text-xs text-slate-400 pl-2 border-l border-slate-500 ml-1">
-                    <p className="text-sky-400 mb-1">1 единица вашей текущей эссенции ({essenceStageDetails.name} {rankInfo.rankColorGroup}) эквивалентна:</p>
-                    {condensationInfo.map((info, index) => (
-                        <p key={index}>
-                           <span className="font-semibold text-sky-300">{formatCondensationFactor(info.factor)}</span> единицам эссенции {info.comparisonStageRankName && `${info.comparisonStageRankName}, `}{info.comparisonStageName}.
-                        </p>
-                    ))}
-                    <p className="mt-2 text-slate-500 italic text-xs">Примечание: Эти значения основаны на правилах конверсии между стадиями и рангами.</p>
+        {selectedGradeInfo && (
+          <div className="p-4 bg-zinc-800/50 rounded-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row gap-6">
+              <div className="flex-1">
+                <label htmlFor="specificMaxEssence" className="block text-sm font-medium text-zinc-400 mb-2">
+                  Точный Максимум ({selectedGradeInfo.minMaxEssence}% - {selectedGradeInfo.maxMaxEssence}%)
+                </label>
+                <div className="flex items-center">
+                  <input
+                    type="range"
+                    id="specificMaxEssence"
+                    min={selectedGradeInfo.minMaxEssence}
+                    max={selectedGradeInfo.maxMaxEssence}
+                    value={specificMaxEssence}
+                    onChange={(e) => onSpecificMaxEssenceChange(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <input
+                    type="number"
+                    value={specificMaxEssence}
+                    onChange={(e) => onSpecificMaxEssenceChange(Number(e.target.value))}
+                    className="w-20 text-center ml-4 bg-zinc-800 border border-zinc-700 rounded-xl p-2"
+                  />
                 </div>
-            )}
-             {showCondensationDetails && condensationInfo.length === 0 && (
-                <p className="text-xs text-slate-500 italic mt-2">Не удалось рассчитать детали конденсации.</p>
-             )}
-        </div>
+              </div>
+            </div>
+             <div className="flex-1">
+                <label htmlFor="currentEssence" className="block text-sm font-medium text-zinc-400 mb-2">
+                  Текущая Эссенция (0% - {specificMaxEssence}%)
+                </label>
+                <div className="flex items-center">
+                  <input
+                    type="range"
+                    id="currentEssence"
+                    min={0}
+                    max={specificMaxEssence}
+                    step={0.1}
+                    value={currentEssencePercentage}
+                    onChange={(e) => onEssenceChange(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <input
+                    type="number"
+                    step={0.1}
+                    value={currentEssencePercentage.toFixed(1)}
+                    onChange={(e) => onEssenceChange(Number(e.target.value))}
+                    className="w-20 text-center ml-4 bg-zinc-800 border border-zinc-700 rounded-xl p-2"
+                  />
+                </div>
+              </div>
+
+
+            <div className="pt-4 border-t border-zinc-700/50 text-sm grid grid-cols-1 gap-x-6 gap-y-2">
+              <div className="flex items-center text-zinc-300">
+                  <CircleStackIcon className="h-5 w-5 mr-2 text-violet-400 flex-shrink-0" />
+                  <p><span className="font-medium text-zinc-400 mr-1">Талант:</span> {selectedGradeInfo.description}</p>
+              </div>
+              <div className="flex items-center text-zinc-300">
+                  <UserCircleIcon className="h-5 w-5 mr-2 text-amber-400 flex-shrink-0" />
+                  <p><span className="font-medium text-zinc-400 mr-1">Ранг:</span> {selectedRankInfo?.name} ({selectedRankInfo?.rankColorGroup})</p>
+              </div>
+              {selectedEssenceDetails && (
+                <>
+                   <div className="flex items-center text-zinc-300">
+                      <StageIcon className="h-5 w-5 mr-2 flex-shrink-0" style={{color: selectedEssenceDetails.color.replace(/0\.\d+/, '1')}}/>
+                      <p><span className="font-medium text-zinc-400 mr-1">Стадия:</span> {selectedEssenceDetails.name}</p>
+                   </div>
+                   <div className="flex items-center text-zinc-300">
+                      <BeakerIcon className="h-5 w-5 mr-2 flex-shrink-0" style={{color: selectedEssenceDetails.color.replace(/0\.\d+/, '1')}}/>
+                      <p><span className="font-medium text-zinc-400 mr-1">Тип Эссенции:</span> {selectedEssenceDetails.stageSpecificEssenceName}</p>
+                   </div>
+                </>
+              )}
+              <div className="flex items-center text-zinc-300">
+                  <BoltIcon className="h-5 w-5 mr-2 text-emerald-400 flex-shrink-0" />
+                  <p><span className="font-medium text-zinc-400 mr-1">Восстановление:</span> ~{selectedGradeInfo.recoveryTimeHours > 0 ? (specificMaxEssence / selectedGradeInfo.recoveryTimeHours).toFixed(1) : '∞'}% / час</p>
+              </div>
+            </div>
+
+             <div className="mt-2 border-t border-zinc-700 pt-3">
+                <button 
+                    onClick={() => setShowCondensationDetails(!showCondensationDetails)}
+                    className="flex items-center justify-between w-full text-sm font-medium text-sky-400 hover:text-sky-300"
+                    aria-expanded={showCondensationDetails}
+                >
+                    <span>Детали Конденсации Эссенции</span>
+                    {showCondensationDetails ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                </button>
+                {showCondensationDetails && condensationInfo.length > 0 && (
+                    <div className="mt-2 space-y-1 text-xs text-zinc-400 pl-2 border-l border-zinc-600 ml-1">
+                        <p className="text-sky-400 mb-1">1 ед. вашей эссенции эквивалентна:</p>
+                        {condensationInfo.map((info, index) => (
+                            <li key={index} className="list-disc ml-4">
+                               <span className="font-semibold text-sky-300">{formatCondensationFactor(info.factor)}</span> ед. эссенции {info.comparisonStageRankName && `${info.comparisonStageRankName}, `}{info.comparisonStageName}.
+                            </li>
+                        ))}
+                    </div>
+                )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

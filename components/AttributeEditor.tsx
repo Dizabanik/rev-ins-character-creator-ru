@@ -80,62 +80,69 @@ const AttributeEditor: React.FC<AttributeEditorProps> = ({
 
 
   return (
-    <div>
-      <p className="text-sm text-slate-400 mb-1">
-        Все базовые характеристики начинаются с {ATTRIBUTE_BASE_SCORE}. У вас есть <span className="font-bold text-red-400">{attributeBuyPoints}</span> очков для повышения базовых характеристик до {ATTRIBUTE_MAX_BUY_SCORE}.
-      </p>
-      <p className="text-xs text-slate-500 mb-3">
-        (Стоимость повышения базовой характеристики: 9-13: 1 очко; 14-15: 2 очка от предыдущего). Расовые модификаторы применяются поверх этих значений.
-      </p>
-      <p className="text-sm text-slate-400 mb-1">
-        Понижение базовой характеристики ниже {ATTRIBUTE_BASE_SCORE} (до {ATTRIBUTE_MIN_SCORE}) даёт <span className="font-bold text-yellow-400">1 Очко Модификации</span> за каждое очко понижения. Повышение такой характеристики обратно к {ATTRIBUTE_BASE_SCORE} стоит ОМ.
-      </p>
-       <p className="text-sm text-slate-400 mb-3">
-        Текущие Очки Модификации: <span className="font-bold text-yellow-400">{modificationPoints}</span>.
-      </p>
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <p className="text-sm text-zinc-400">
+          Все базовые характеристики начинаются с {ATTRIBUTE_BASE_SCORE}. Повышение стоит очков, понижение дает Очки Модификации.
+        </p>
+        <div className="flex justify-center items-center gap-6">
+            <p className="text-sm text-zinc-300">
+                Очки покупки: <span className="font-bold text-lg text-indigo-400">{attributeBuyPoints}</span>
+            </p>
+            <p className="text-sm text-zinc-300">
+                Очки Модификации: <span className="font-bold text-lg text-amber-400">{modificationPoints}</span>
+            </p>
+        </div>
+      </div>
 
-      {DND_ATTRIBUTES_KEYS.map((attrKey) => {
-        const baseScore = baseAttributes[attrKey];
-        const racialMod = racialModifiers?.[attrKey] || 0;
-        const finalScore = baseScore + racialMod;
-        const finalModifier = calculateModifier(finalScore);
-        
-        let racialModString = "";
-        if (racialMod > 0) racialModString = '(База ' + baseScore + ', Раса +' + racialMod + ')';
-        else if (racialMod < 0) racialModString = '(База ' + baseScore + ', Раса ' + racialMod + ')';
-        else racialModString = '(База ' + baseScore + ')';
+      <div className="space-y-3">
+        {DND_ATTRIBUTES_KEYS.map((attrKey) => {
+            const baseScore = baseAttributes[attrKey];
+            const racialMod = racialModifiers?.[attrKey] || 0;
+            const finalScore = baseScore + racialMod;
+            const finalModifier = calculateModifier(finalScore);
+            
+            let racialModString = "";
+            if (racialMod > 0) racialModString = `(База ${baseScore}, Раса +${racialMod})`;
+            else if (racialMod < 0) racialModString = `(База ${baseScore}, Раса ${racialMod})`;
+            else racialModString = `(База ${baseScore})`;
 
-        return (
-            <div key={attrKey} className="flex justify-between items-center mb-3 p-3 bg-slate-700/50 rounded-md">
-            <div className="w-48">
-                <span className="capitalize text-slate-300">{DND_ATTRIBUTE_NAMES_RU[attrKey]}:</span>
-                <span className="block text-xs text-slate-400 -mt-0.5">{racialModString}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-                <button
-                onClick={() => handleAttributeChange(attrKey, false)}
-                disabled={!canDecrease(attrKey)}
-                className="p-1.5 bg-red-700 hover:bg-red-600 rounded-full text-white disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                aria-label={'Уменьшить ' + DND_ATTRIBUTE_NAMES_RU[attrKey]}
-                >
-                <MinusIcon />
-                </button>
-                <span className="w-8 text-center font-semibold text-lg text-slate-100 tabular-nums">{finalScore}</span>
-                <span className={'w-10 text-center text-sm font-medium p-1 rounded-md tabular-nums ' + (finalModifier >= 0 ? 'text-green-300 bg-green-700/30' : 'text-red-300 bg-red-700/30')}>
-                    {finalModifier >= 0 ? '+' + finalModifier : finalModifier}
-                </span>
-                <button
-                onClick={() => handleAttributeChange(attrKey, true)}
-                disabled={!canIncrease(attrKey)}
-                className="p-1.5 bg-green-600 hover:bg-green-500 rounded-full text-white disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                aria-label={'Увеличить ' + DND_ATTRIBUTE_NAMES_RU[attrKey]}
-                >
-                <PlusIcon />
-                </button>
-            </div>
-            </div>
-        );
-      })}
+            return (
+                <div key={attrKey} className="flex justify-between items-center p-4 bg-zinc-800/50 rounded-2xl">
+                    <div className="w-48">
+                        <span className="capitalize text-zinc-200 font-medium">{DND_ATTRIBUTE_NAMES_RU[attrKey]}</span>
+                        <span className="block text-xs text-zinc-400">{racialModString}</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <button
+                            onClick={() => handleAttributeChange(attrKey, false)}
+                            disabled={!canDecrease(attrKey)}
+                            className="p-2 bg-zinc-700/80 hover:bg-zinc-700 rounded-full text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            aria-label={'Уменьшить ' + DND_ATTRIBUTE_NAMES_RU[attrKey]}
+                        >
+                            <MinusIcon className="w-5 h-5"/>
+                        </button>
+                        
+                        <div className="flex items-baseline space-x-2">
+                             <span className="w-10 text-center font-semibold text-3xl text-zinc-100 tabular-nums">{finalScore}</span>
+                             <span className={`w-10 text-center text-md font-medium tabular-nums ${finalModifier >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {finalModifier >= 0 ? `+${finalModifier}` : finalModifier}
+                            </span>
+                        </div>
+
+                        <button
+                            onClick={() => handleAttributeChange(attrKey, true)}
+                            disabled={!canIncrease(attrKey)}
+                            className="p-2 bg-zinc-700/80 hover:bg-zinc-700 rounded-full text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            aria-label={'Увеличить ' + DND_ATTRIBUTE_NAMES_RU[attrKey]}
+                        >
+                            <PlusIcon className="w-5 h-5"/>
+                        </button>
+                    </div>
+                </div>
+            );
+        })}
+        </div>
     </div>
   );
 };

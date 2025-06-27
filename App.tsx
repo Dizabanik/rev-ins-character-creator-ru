@@ -539,7 +539,7 @@ const App = (): JSX.Element => {
 
     newDerivedStats.push(`Хитпоинты: ${currentHp} / ${maxHp}`);
     newDerivedStats.push(`Кости Хитов: ${currentHitDice} / ${maxHitDice} (d${hitDieType})`); // Updated to use hitDieType state
-    if (exhaustionLevel > 0) {
+    if (exhaustionLevel >= 0) { // Always show exhaustion
         newDerivedStats.push(`Уровень Истощения: ${exhaustionLevel}`);
     }
 
@@ -868,164 +868,136 @@ const App = (): JSX.Element => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-slate-200 p-4 md:p-8 flex flex-col items-center">
-      <header className="mb-8 text-center">
-        <h1 className="text-5xl font-bold text-red-500 tracking-tight">Создание Персонажа</h1>
-        <p className="text-xl text-slate-300">Создатель Персонажей (Телепортирован в мир)</p>
+    <div className="min-h-screen bg-zinc-950 text-zinc-200 p-4 md:p-8 flex flex-col items-center">
+      <header className="mb-10 text-center">
+        <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-500 tracking-tight">Создание Персонажа</h1>
+        <p className="text-xl text-zinc-400 mt-2">Потерянная Душа в Мире Гу</p>
       </header>
 
       {!showSummary ? (
-        <div className="w-full max-w-5xl space-y-6">
-          <SectionPanel title="Производные Эффекты и Состояния">
-            {derivedStats.length > 0 ? (
-              <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 items-stretch">
-                {derivedStats.map((statString, index) => {
-                  const parsed = parseDerivedStatValue(statString);
-                  if (parsed.isApertureInfo) return null; 
+        <div className="w-full max-w-6xl space-y-8">
+          <SectionPanel title="Ключевые Показатели">
+              {derivedStats.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-stretch">
+                  {derivedStats.map((statString, index) => {
+                    const parsed = parseDerivedStatValue(statString);
+                    if (parsed.isApertureInfo) return null; 
 
-                  const valueFontSize = parsed.isSkill || parsed.isHpInfo ? 'text-xl' : 'text-3xl';
-                  const labelFontSize = parsed.isSkill || parsed.isHpInfo ? 'text-xs' : 'text-xs';
-                  const containerClasses = !parsed.isNumeric && !parsed.isHpInfo ? 'col-span-2 sm:col-span-full md:col-span-full lg:col-span-full' : '';
+                    const valueFontSize = parsed.isSkill || parsed.isHpInfo ? 'text-xl' : 'text-3xl';
+                    const labelFontSize = 'text-xs uppercase tracking-wider font-semibold';
+                    const containerClasses = !parsed.isNumeric && !parsed.isHpInfo ? 'col-span-2 sm:col-span-full md:col-span-full lg:col-span-full' : '';
 
-                  return (
-                    <li key={index} className={`flex flex-col items-center justify-center p-3 bg-slate-800/70 rounded-lg text-center h-full shadow-lg ${containerClasses}`}>
-                      {parsed.IconComponent && <parsed.IconComponent className={`h-6 w-6 mb-1.5 ${parsed.iconColor}`} />}
-                      {parsed.isNumeric ? (
-                        <>
-                          <span className={`${valueFontSize} font-bold ${parsed.valueColor}`}>{parsed.value}{parsed.suffix}</span>
-                          <span className={`${labelFontSize} text-slate-400 mt-1`}>{parsed.label}</span>
-                        </>
-                      ) : (
-                         parsed.isHpInfo ? ( 
-                            <>
-                                <span className={`${valueFontSize} font-bold ${parsed.valueColor}`}>{parsed.value}</span>
-                                <span className={`${labelFontSize} text-slate-400 mt-1 flex items-center justify-center`}>
-                                  {parsed.label} {parsed.suffix}
-                                  {parsed.isHitDieInfo && (
-                                    <HitDieTypeEditor
-                                        currentValue={hitDieType}
-                                        onChange={handleHitDieTypeChange}
-                                        disabled={showSummary}
-                                    />
-                                  )}
-                                </span>
-                            </>
-                         ) : (
-                            <div className="text-left w-full">
-                               <span className={`text-sm text-slate-300`}><strong className={parsed.iconColor || 'text-sky-400'}>{parsed.label}:</strong> {parsed.value}</span>
-                            </div>
-                         )
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-slate-400 italic">Рассчитываем эффекты...</p>
-            )}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mt-4 pt-3 border-t border-slate-700">
-                <div>
-                    <label htmlFor="manualMaxHpMod" className="block text-sm font-medium text-slate-300 mb-1">
-                        <HeartIcon className="inline h-4 w-4 mr-1 text-red-400" />
-                        Модификатор Макс. ХП:
-                    </label>
-                    <div className="flex items-center space-x-2 max-w-xs mx-auto md:mx-0">
-                        <button
-                            onClick={() => handleManualMaxHpModifierChange(manualMaxHpModifier - 1)}
-                            className="p-1.5 bg-red-700 hover:bg-red-600 rounded-full text-white disabled:bg-slate-600"
-                            disabled={showSummary}
-                            aria-label="Уменьшить модификатор макс. ХП"
-                        >
-                            <MinusIcon />
-                        </button>
-                        <input
-                            type="number"
-                            id="manualMaxHpMod"
-                            value={manualMaxHpModifier}
-                            onChange={(e) => handleManualMaxHpModifierChange(parseInt(e.target.value) || 0)}
-                            className="w-20 text-center bg-slate-700/80 border border-slate-600 text-slate-100 rounded-md p-1.5 focus:ring-red-500 focus:border-red-500 transition duration-150 tabular-nums"
-                            disabled={showSummary}
-                            aria-label="Ручной модификатор максимальных ХП"
-                        />
-                        <button
-                            onClick={() => handleManualMaxHpModifierChange(manualMaxHpModifier + 1)}
-                            className="p-1.5 bg-green-600 hover:bg-green-500 rounded-full text-white disabled:bg-slate-600"
-                            disabled={showSummary}
-                            aria-label="Увеличить модификатор макс. ХП"
-                        >
-                            <PlusIcon />
-                        </button>
-                    </div>
+                    return (
+                      <div key={index} className={`flex flex-col items-center justify-center p-4 bg-zinc-800/70 rounded-2xl text-center h-full ${containerClasses}`}>
+                        {parsed.IconComponent && <parsed.IconComponent className={`h-6 w-6 mb-2 ${parsed.iconColor}`} />}
+                        {parsed.isNumeric ? (
+                          <>
+                            <span className={`${valueFontSize} font-bold ${parsed.valueColor}`}>{parsed.value}{parsed.suffix}</span>
+                            <span className={`${labelFontSize} text-zinc-400 mt-1`}>{parsed.label}</span>
+                          </>
+                        ) : (
+                          parsed.isHpInfo ? ( 
+                              <>
+                                  <span className={`${valueFontSize} font-bold ${parsed.valueColor}`}>{parsed.value}</span>
+                                  <span className={`${labelFontSize} text-zinc-400 mt-1 flex items-center justify-center`}>
+                                    {parsed.label} {parsed.suffix}
+                                    {parsed.isHitDieInfo && (
+                                      <HitDieTypeEditor
+                                          currentValue={hitDieType}
+                                          onChange={handleHitDieTypeChange}
+                                          disabled={showSummary}
+                                      />
+                                    )}
+                                  </span>
+                              </>
+                          ) : (
+                              <div className="text-left w-full">
+                                <span className={`text-sm text-zinc-300`}><strong className={`${parsed.iconColor} font-semibold`}>{parsed.label}:</strong> {parsed.value}</span>
+                              </div>
+                          )
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                <div>
-                    <label htmlFor="manualAcMod" className="block text-sm font-medium text-slate-300 mb-1">
-                        <ArmorClassIcon className="inline h-4 w-4 mr-1 text-blue-400" />
-                        Модификатор КБ:
-                    </label>
-                    <div className="flex items-center space-x-2 max-w-xs mx-auto md:mx-0">
-                        <button
-                            onClick={() => handleManualAcModifierChange(manualAcModifier - 1)}
-                            className="p-1.5 bg-red-700 hover:bg-red-600 rounded-full text-white disabled:bg-slate-600"
-                            disabled={showSummary}
-                            aria-label="Уменьшить модификатор КБ"
-                        >
-                            <MinusIcon />
-                        </button>
-                        <input
-                            type="number"
-                            id="manualAcMod"
-                            value={manualAcModifier}
-                            onChange={(e) => handleManualAcModifierChange(parseInt(e.target.value) || 0)}
-                            className="w-20 text-center bg-slate-700/80 border border-slate-600 text-slate-100 rounded-md p-1.5 focus:ring-blue-500 focus:border-blue-500 transition duration-150 tabular-nums"
-                            disabled={showSummary}
-                            aria-label="Ручной модификатор Класса Брони"
-                        />
-                        <button
-                            onClick={() => handleManualAcModifierChange(manualAcModifier + 1)}
-                            className="p-1.5 bg-green-600 hover:bg-green-500 rounded-full text-white disabled:bg-slate-600"
-                            disabled={showSummary}
-                            aria-label="Увеличить модификатор КБ"
-                        >
-                            <PlusIcon />
-                        </button>
-                    </div>
-                </div>
-            </div>
+              ) : (
+                <p className="text-zinc-500 italic text-center">Рассчитываем эффекты...</p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mt-6 pt-6 border-t border-zinc-800">
+                  <div>
+                      <label htmlFor="manualMaxHpMod" className="block text-sm font-medium text-zinc-400 mb-2">
+                          <HeartIcon className="inline h-4 w-4 mr-1.5 text-rose-500" />
+                          Ручной Модификатор Макс. ХП
+                      </label>
+                      <div className="flex items-center space-x-2">
+                           <input
+                              type="number"
+                              id="manualMaxHpMod"
+                              value={manualMaxHpModifier}
+                              onChange={(e) => handleManualMaxHpModifierChange(parseInt(e.target.value) || 0)}
+                              className="w-full text-center bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-xl p-2.5 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition tabular-nums"
+                              disabled={showSummary}
+                           />
+                      </div>
+                  </div>
+                  <div>
+                      <label htmlFor="manualAcMod" className="block text-sm font-medium text-zinc-400 mb-2">
+                          <ArmorClassIcon className="inline h-4 w-4 mr-1.5 text-sky-500" />
+                          Ручной Модификатор КБ
+                      </label>
+                       <div className="flex items-center space-x-2">
+                          <input
+                              type="number"
+                              id="manualAcMod"
+                              value={manualAcModifier}
+                              onChange={(e) => handleManualAcModifierChange(parseInt(e.target.value) || 0)}
+                              className="w-full text-center bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-xl p-2.5 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition tabular-nums"
+                              disabled={showSummary}
+                          />
+                      </div>
+                  </div>
+              </div>
           </SectionPanel>
 
-          <SectionPanel title="Уровень Персонажа">
-            <div className="flex items-center justify-center space-x-4">
-                <button
-                    onClick={() => handleLevelChange(false)}
-                    disabled={characterLevel <= 1}
-                    className="p-2 bg-red-700 hover:bg-red-600 rounded-full text-white disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                    aria-label="Уменьшить уровень"
-                >
-                    <MinusIcon className="w-6 h-6"/>
-                </button>
-                <span className="text-3xl font-bold text-yellow-400 tabular-nums">{characterLevel}</span>
-                <button
-                    onClick={() => handleLevelChange(true)}
-                    className="p-2 bg-green-600 hover:bg-green-500 rounded-full text-white transition-colors"
-                    aria-label="Увеличить уровень"
-                >
-                    <PlusIcon className="w-6 h-6"/>
-                </button>
-            </div>
-            <p className="text-center text-sm text-slate-400 mt-2">
-                Текущий Бонус Умения: <strong className="text-yellow-300">+{currentProficiencyBonus}</strong>
-            </p>
+          <SectionPanel title="Уровень и Состояние Персонажа">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-300 mb-3 text-center">Уровень</h3>
+                  <div className="flex items-center justify-center space-x-4">
+                      <button
+                          onClick={() => handleLevelChange(false)}
+                          disabled={characterLevel <= 1}
+                          className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          aria-label="Уменьшить уровень"
+                      >
+                          <MinusIcon className="w-6 h-6"/>
+                      </button>
+                      <span className="text-5xl font-bold text-amber-400 tabular-nums">{characterLevel}</span>
+                      <button
+                          onClick={() => handleLevelChange(true)}
+                          className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-300 transition-colors"
+                          aria-label="Увеличить уровень"
+                      >
+                          <PlusIcon className="w-6 h-6"/>
+                      </button>
+                  </div>
+                  <p className="text-center text-sm text-zinc-400 mt-2">
+                      Бонус Умения: <strong className="text-amber-300">+{currentProficiencyBonus}</strong>
+                  </p>
+                </div>
+                <div className="border-t border-zinc-800 md:border-t-0 md:border-l md:pl-8">
+                   <CharacterStatusPanel
+                      character={currentCharacter}
+                      onPassTime={passTime}
+                      onShortRest={handleShortRest}
+                      onLongRest={handleLongRest}
+                      onSpendHitDice={spendHitDice}
+                      onArmorTypeChange={setArmorTypeWornForSleep}
+                      onCurrentHpChange={setCurrentHp}
+                  />
+                </div>
+             </div>
          </SectionPanel>
-
-        <CharacterStatusPanel
-            character={currentCharacter}
-            onPassTime={passTime}
-            onShortRest={handleShortRest}
-            onLongRest={handleLongRest}
-            onSpendHitDice={spendHitDice}
-            onArmorTypeChange={setArmorTypeWornForSleep}
-            onCurrentHpChange={setCurrentHp}
-        />
         
         <SectionPanel title="Инвентарь и Экипировка">
             <Inventory 
@@ -1036,7 +1008,7 @@ const App = (): JSX.Element => {
             />
         </SectionPanel>
         
-         <SectionPanel title="Состояние Апертуры и Первобытной Эссенции">
+         <SectionPanel title="Апертура и Первобытная Эссенция">
             <ApertureDisplay
                 selectedGradeId={selectedApertureGradeId}
                 onGradeChange={handleApertureGradeChange}
@@ -1053,15 +1025,15 @@ const App = (): JSX.Element => {
 
 
           <SectionPanel title="Личность и Происхождение">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               <div>
-                <label htmlFor="characterName" className="block text-sm font-medium text-slate-300 mb-1">Имя Персонажа</label>
+                <label htmlFor="characterName" className="block text-sm font-medium text-zinc-400 mb-2">Имя Персонажа</label>
                 <input
                   type="text"
                   id="characterName"
                   value={characterName}
                   onChange={(e) => setCharacterName(e.target.value)}
-                  className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500 transition duration-150"
+                  className="w-full bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
                   placeholder="Введите имя персонажа"
                 />
               </div>
@@ -1078,45 +1050,20 @@ const App = (): JSX.Element => {
               </div>
             </div>
             {selectedRace && (
-              <div className="mt-4 p-3 bg-slate-700/30 rounded-md shadow">
-                <h4 className="text-md font-semibold text-red-300 mb-1">{selectedRace.name}</h4>
-                <p className="text-sm text-slate-300 mb-2">{selectedRace.description}</p>
-                {selectedRace.hitDieInfoText && (
-                    <p className="text-sm text-yellow-300 mb-1.5">{selectedRace.hitDieInfoText}</p>
-                )}
-                {selectedRace.specialAbilities.length > 0 && (
-                  <div>
-                    <h5 className="text-sm font-medium text-slate-200 mb-0.5">Особые способности расы:</h5>
-                    <ul className="list-disc list-inside text-xs text-slate-300 space-y-0.5">
-                      {selectedRace.specialAbilities.map((ability, idx) => (
-                        <li key={idx}>{ability}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                 {selectedRace.attributeModifiers && Object.keys(selectedRace.attributeModifiers).length > 0 && (
-                    <div className="mt-1.5">
-                        <h5 className="text-sm font-medium text-slate-200 mb-0.5">Расовые модификаторы характеристик:</h5>
-                        <ul className="list-disc list-inside text-xs text-slate-300 space-y-0.5">
-                        {Object.entries(selectedRace.attributeModifiers).map(([attr, mod]) => (
-                            <li key={attr}>{DND_ATTRIBUTE_NAMES_RU[attr as DndAttribute]}: {mod! > 0 ? '+' : ''}{mod}</li>
-                        ))}
-                        </ul>
-                    </div>
-                 )}
-                 {selectedRace.skillModifiers && Object.keys(selectedRace.skillModifiers).length > 0 && (
-                    <div className="mt-1.5">
-                        <h5 className="text-sm font-medium text-slate-200 mb-0.5">Расовые модификаторы навыков:</h5>
-                        <ul className="list-disc list-inside text-xs text-slate-300 space-y-0.5">
-                        {Object.entries(selectedRace.skillModifiers).map(([skillId, mod]) => {
-                            const skill = AVAILABLE_SKILLS.find(s => s.id === skillId);
-                            return (
-                                <li key={skillId}>{skill ? skill.name : skillId}: {mod > 0 ? '+' : ''}{mod}</li>
-                            );
-                        })}
-                        </ul>
-                    </div>
+              <div className="mt-4 p-4 bg-zinc-800/50 rounded-2xl">
+                <h4 className="text-md font-semibold text-indigo-300 mb-1">{selectedRace.name}</h4>
+                <p className="text-sm text-zinc-300 mb-3">{selectedRace.description}</p>
+                <div className="space-y-2 text-xs text-zinc-400 border-t border-zinc-700 pt-3">
+                  {selectedRace.hitDieInfoText && (
+                      <p className="text-amber-400 font-medium">{selectedRace.hitDieInfoText}</p>
                   )}
+                  {selectedRace.specialAbilities.length > 0 && (
+                      <p><strong className="text-zinc-300">Способности:</strong> {selectedRace.specialAbilities.join(', ')}</p>
+                  )}
+                  {selectedRace.attributeModifiers && Object.keys(selectedRace.attributeModifiers).length > 0 && (
+                    <p><strong className="text-zinc-300">Моды Характеристик:</strong> {Object.entries(selectedRace.attributeModifiers).map(([attr, mod]) => `${DND_ATTRIBUTE_NAMES_RU[attr as DndAttribute]}: ${mod! > 0 ? '+' : ''}${mod}`).join(', ')}</p>
+                  )}
+                </div>
               </div>
             )}
           </SectionPanel>
@@ -1124,35 +1071,35 @@ const App = (): JSX.Element => {
           <SectionPanel title="Внешность и Предыстория">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
               <div>
-                  <label htmlFor="characterAge" className="block text-sm font-medium text-slate-300 mb-1">Возраст (в прошлом мире)</label>
-                  <input type="text" id="characterAge" value={age} onChange={(e) => setAge(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. 25 лет"/>
+                  <label htmlFor="characterAge" className="block text-sm font-medium text-zinc-400 mb-2">Возраст</label>
+                  <input type="text" id="characterAge" value={age} onChange={(e) => setAge(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500" placeholder="25 лет"/>
               </div>
               <div>
-                  <label htmlFor="characterHeight" className="block text-sm font-medium text-slate-300 mb-1">Рост</label>
-                  <input type="text" id="characterHeight" value={height} onChange={(e) => setHeight(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. 180 см"/>
+                  <label htmlFor="characterHeight" className="block text-sm font-medium text-zinc-400 mb-2">Рост</label>
+                  <input type="text" id="characterHeight" value={height} onChange={(e) => setHeight(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500" placeholder="180 см"/>
               </div>
               <div>
-                  <label htmlFor="characterWeight" className="block text-sm font-medium text-slate-300 mb-1">Вес</label>
-                  <input type="text" id="characterWeight" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. 75 кг"/>
+                  <label htmlFor="characterWeight" className="block text-sm font-medium text-zinc-400 mb-2">Вес</label>
+                  <input type="text" id="characterWeight" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500" placeholder="75 кг"/>
               </div>
               <div className="col-span-1">
-                  <label htmlFor="characterEyeColor" className="block text-sm font-medium text-slate-300 mb-1">Цвет глаз</label>
-                  <input type="text" id="characterEyeColor" value={eyeColor} onChange={(e) => setEyeColor(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. Карие"/>
+                  <label htmlFor="characterEyeColor" className="block text-sm font-medium text-zinc-400 mb-2">Цвет глаз</label>
+                  <input type="text" id="characterEyeColor" value={eyeColor} onChange={(e) => setEyeColor(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500" placeholder="Карие"/>
               </div>
               <div className="col-span-2">
-                  <label htmlFor="characterHairColor" className="block text-sm font-medium text-slate-300 mb-1">Волосы</label>
-                  <input type="text" id="characterHairColor" value={hairColor} onChange={(e) => setHairColor(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. Короткие, черные"/>
+                  <label htmlFor="characterHairColor" className="block text-sm font-medium text-zinc-400 mb-2">Волосы</label>
+                  <input type="text" id="characterHairColor" value={hairColor} onChange={(e) => setHairColor(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500" placeholder="Короткие, черные"/>
               </div>
             </div>
             <div>
-              <label htmlFor="manualBackstory" className="block text-sm font-medium text-slate-300 mb-1">История персонажа (до телепортации)</label>
+              <label htmlFor="manualBackstory" className="block text-sm font-medium text-zinc-400 mb-2">История (до телепортации)</label>
               <textarea
                   id="manualBackstory"
                   value={manualBackstory}
                   onChange={(e) => setManualBackstory(e.target.value)}
                   rows={6}
-                  className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="Опишите прошлое вашего персонажа, его жизнь, стремления и то, что он мог делать в момент телепортации..."
+                  className="w-full bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Опишите прошлое вашего персонажа..."
               ></textarea>
             </div>
           </SectionPanel>
@@ -1169,271 +1116,210 @@ const App = (): JSX.Element => {
             />
           </SectionPanel>
           
-          <SectionPanel title="Особенности (Трейты) и Стартовое Снаряжение">
-            <p className="text-sm text-slate-400 mb-3">
-                Доступные Очки Модификации: <span className={'font-bold ' + (modificationPoints < 0 ? 'text-red-400' : 'text-green-400')}>{modificationPoints}</span>
+          <SectionPanel title="Особенности и Снаряжение">
+            <p className="text-center text-sm text-zinc-400 mb-4">
+                Доступные Очки Модификации: <span className={`font-bold text-lg ${modificationPoints < 0 ? 'text-rose-400' : 'text-amber-400'}`}>{modificationPoints}</span>
             </p>
-            <p className="text-xs text-slate-500 mb-3">
-                Выбранные здесь предметы автоматически появятся в вашем рюкзаке в панели "Инвентарь и Экипировка" выше.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
-                <h4 className="text-lg font-semibold text-red-300 mb-2 flex items-center"><BookOpenIcon className="mr-2 text-red-400"/>Особенности (Трейты)</h4>
-                {AVAILABLE_TRAITS.length > 0 ? AVAILABLE_TRAITS.map(trait => (
-                  <div key={trait.id} className="flex items-center justify-between p-2 bg-slate-700/40 rounded mb-1.5 hover:bg-slate-600/50 transition-colors">
-                    <div className="flex-grow mr-2">
-                      <label htmlFor={'trait-' + trait.id} className="text-slate-200 cursor-pointer">
-                        {trait.name} <span className="text-xs text-slate-400">({trait.description})</span>
-                      </label>
-                      <p className={'text-xs ' + (trait.modificationPointCost <= 0 ? 'text-green-400' : 'text-yellow-400')}>
-                        {trait.modificationPointCost < 0 ? 'Дает ОМ: ' + (trait.modificationPointCost * -1) : 'Стоимость ОМ: ' + trait.modificationPointCost}
-                      </p>
+                <h4 className="text-lg font-semibold text-zinc-300 mb-3">Особенности (Трейты)</h4>
+                <div className="space-y-2">
+                  {AVAILABLE_TRAITS.map(trait => (
+                    <div key={trait.id} className="flex items-start justify-between p-3 bg-zinc-800/50 rounded-xl hover:bg-zinc-800 transition-colors">
+                      <div className="flex-grow mr-4">
+                        <label htmlFor={'trait-' + trait.id} className="text-zinc-200 font-medium cursor-pointer">{trait.name}</label>
+                        <p className="text-xs text-zinc-400 mt-1">{trait.description}</p>
+                        <p className={`text-xs mt-1 font-semibold ${trait.modificationPointCost <= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {trait.modificationPointCost < 0 ? `Дает ${trait.modificationPointCost * -1} ОМ` : `Стоимость: ${trait.modificationPointCost} ОМ`}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox" id={'trait-' + trait.id}
+                        checked={selectedTraits.some(t => t.id === trait.id)}
+                        onChange={() => handleToggleTrait(trait)}
+                        className="form-checkbox h-5 w-5 mt-1 flex-shrink-0"
+                      />
                     </div>
-                    <input
-                      type="checkbox"
-                      id={'trait-' + trait.id}
-                      checked={selectedTraits.some(t => t.id === trait.id)}
-                      onChange={() => handleToggleTrait(trait)}
-                      className="form-checkbox h-5 w-5 text-red-500 bg-slate-600 border-slate-500 rounded focus:ring-red-600 cursor-pointer flex-shrink-0"
-                    />
-                  </div>
-                )) : <p className="text-slate-400 italic text-sm">Положительные особенности не найдены или все изъяны перенесены.</p>}
+                  ))}
+                </div>
               </div>
               <div>
-                <h4 className="text-lg font-semibold text-red-300 mb-2 flex items-center"><BackpackIcon className="mr-2 text-red-400"/>Стартовые Предметы</h4>
-                 {AVAILABLE_STARTING_ITEMS.map(item => (
-                  <div key={item.id} className="flex items-center justify-between p-2 bg-slate-700/40 rounded mb-1.5 hover:bg-slate-600/50 transition-colors">
-                    <div className="flex-grow mr-2">
-                      <label htmlFor={'item-' + item.id} className="text-slate-200 cursor-pointer">
-                        {item.name} <span className="text-xs text-slate-400">({item.description})</span>
-                      </label>
-                       <p className={'text-xs ' + (item.modificationPointCost === 0 ? 'text-slate-400' : 'text-yellow-400')}>
-                        Стоимость ОМ: {item.modificationPointCost}
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      id={'item-' + item.id}
-                      checked={selectedItems.some(i => i.id === item.id)}
-                      onChange={() => handleToggleItem(item)}
-                      className="form-checkbox h-5 w-5 text-red-500 bg-slate-600 border-slate-500 rounded focus:ring-red-600 cursor-pointer flex-shrink-0"
-                    />
-                  </div>
-                ))}
+                <h4 className="text-lg font-semibold text-zinc-300 mb-3">Стартовые Предметы</h4>
+                 <div className="space-y-2">
+                    {AVAILABLE_STARTING_ITEMS.map(item => (
+                      <div key={item.id} className="flex items-start justify-between p-3 bg-zinc-800/50 rounded-xl hover:bg-zinc-800 transition-colors">
+                         <div className="flex-grow mr-4">
+                            <label htmlFor={'item-' + item.id} className="text-zinc-200 font-medium cursor-pointer">{item.name}</label>
+                            <p className="text-xs text-zinc-400 mt-1">{item.description}</p>
+                            <p className={`text-xs mt-1 font-semibold ${item.modificationPointCost === 0 ? 'text-zinc-500' : 'text-amber-400'}`}>
+                              Стоимость: {item.modificationPointCost} ОМ
+                            </p>
+                        </div>
+                        <input
+                          type="checkbox" id={'item-' + item.id}
+                          checked={selectedItems.some(i => i.id === item.id)}
+                          onChange={() => handleToggleItem(item)}
+                          className="form-checkbox h-5 w-5 mt-1 flex-shrink-0"
+                        />
+                      </div>
+                    ))}
+                 </div>
               </div>
             </div>
           </SectionPanel>
 
           <SectionPanel title="Владение Навыками">
-            <p className="text-sm text-slate-400 mb-1">
-              Выберите {MAX_SKILL_PROFICIENCIES} владения навыками. Владение добавляет ваш Бонус Умения (<strong className="text-yellow-300">+{currentProficiencyBonus}</strong>) к проверкам навыка.
+            <p className="text-center text-sm text-zinc-400 mb-1">
+              Выберите {MAX_SKILL_PROFICIENCIES} владения навыками. Бонус умения: <strong className="text-amber-400">+{currentProficiencyBonus}</strong>
             </p>
-            {selectedSkills.length < 2 ? (
-              <p className="text-xs text-slate-500 mb-3">
-                Первые два навыка должны быть выбраны из списка навыков, относящихся к вашим двум наивысшим итоговым характеристикам (включая расовые моды).
-                <br />
-                Текущие доступные группы характеристик: <strong className="text-yellow-400">{eligibleAttributesForFirstSkills.map(attr => DND_ATTRIBUTE_NAMES_RU[attr]).join(', ') || 'Нет доступных из-за низких характеристик'}</strong>.
-                <br />
-                Третий навык можно будет выбрать из любого списка после этого.
-              </p>
-            ) : selectedSkills.length === 2 ? (
-              <p className="text-xs text-slate-500 mb-3">
-                Отлично! Теперь выберите ваш <strong className="text-indigo-400">третий (и последний) навык</strong> из любого доступного списка ниже.
-              </p>
-            ) : (
-              <p className="text-xs text-slate-500 mb-3">
-                Все {MAX_SKILL_PROFICIENCIES} навыка выбраны. Вы можете изменить свой выбор. При значимом изменении характеристик выбор навыков может быть сброшен.
-              </p>
-            )}
-            <p className="text-sm text-slate-400 mb-3">
-              Выбрано: <span className="font-bold text-red-400">{selectedSkills.length} / {MAX_SKILL_PROFICIENCIES}</span>
+            <p className="text-center text-sm font-semibold text-zinc-200 mb-4">
+              Выбрано: <span className="text-lg text-indigo-400">{selectedSkills.length} / {MAX_SKILL_PROFICIENCIES}</span>
             </p>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {AVAILABLE_SKILLS.map(skill => {
                 const isSelected = selectedSkills.some(s => s.id === skill.id);
-                const skillIndexInSelection = selectedSkills.findIndex(s => s.id === skill.id);
                 let isDisabled = false;
-                let currentSkillDisplayClass = '';
-
-                if (isSelected) {
-                    isDisabled = false; 
-                    if (selectedSkills.length === MAX_SKILL_PROFICIENCIES && skillIndexInSelection === MAX_SKILL_PROFICIENCIES - 1) {
-                        currentSkillDisplayClass = 'bg-indigo-600/70 ring-2 ring-indigo-400'; 
-                    } else {
-                        currentSkillDisplayClass = 'bg-red-700/60 ring-2 ring-red-500'; 
-                    }
-                } else { 
+                
+                if (!isSelected) {
                     if (selectedSkills.length >= MAX_SKILL_PROFICIENCIES) {
                         isDisabled = true; 
-                        currentSkillDisplayClass = 'bg-slate-800/50 opacity-60 cursor-not-allowed';
-                    } else if (selectedSkills.length < 2) { 
-                        if (eligibleAttributesForFirstSkills.includes(skill.relatedAttribute)) {
-                            isDisabled = false; 
-                            currentSkillDisplayClass = 'bg-slate-700/40 hover:bg-slate-600/50';
-                        } else {
-                            isDisabled = true; 
-                            currentSkillDisplayClass = 'bg-slate-800/50 opacity-60 cursor-not-allowed';
-                        }
-                    } else { 
-                        isDisabled = false; 
-                        currentSkillDisplayClass = 'bg-slate-700/40 hover:bg-slate-600/50';
+                    } else if (selectedSkills.length < 2 && !eligibleAttributesForFirstSkills.includes(skill.relatedAttribute)) {
+                        isDisabled = true;
                     }
                 }
                 
                 return (
-                    <div key={skill.id} className={'p-3 rounded-md transition-all duration-150 ease-in-out ' + currentSkillDisplayClass}>
-                    <label className={'flex items-center space-x-3 ' + (isDisabled ? 'cursor-not-allowed' : 'cursor-pointer')}>
-                        <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleToggleSkill(skill)}
-                        disabled={isDisabled}
-                        className="form-checkbox h-5 w-5 text-red-500 bg-slate-600 border-slate-500 rounded focus:ring-red-600 disabled:opacity-70 disabled:cursor-not-allowed"
-                        />
-                        <div className="flex-grow">
-                        <span className={'font-medium ' + (isDisabled && !isSelected ? 'text-slate-400' : 'text-slate-100')}>{skill.name}</span>
-                        <p className={'text-xs ' + (isDisabled && !isSelected ? 'text-slate-500' : 'text-slate-400')}>{skill.description} (Основан на: <span className="capitalize">{DND_ATTRIBUTE_NAMES_RU[skill.relatedAttribute]}</span>)</p>
+                    <div key={skill.id} 
+                      className={`p-3 rounded-2xl transition-all duration-150 ease-in-out 
+                        ${isSelected ? 'bg-indigo-600/30 ring-2 ring-indigo-500' : 'bg-zinc-800/50'}
+                        ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-700/70'}
+                      `}
+                      onClick={() => !isDisabled && handleToggleSkill(skill)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <input type="checkbox" readOnly checked={isSelected} disabled={isDisabled} className="form-checkbox h-5 w-5"/>
+                        <div>
+                          <span className="font-medium text-zinc-100">{skill.name}</span>
+                          <p className="text-xs text-zinc-400 capitalize">{DND_ATTRIBUTE_NAMES_RU[skill.relatedAttribute]}</p>
                         </div>
-                    </label>
+                      </div>
                     </div>
                 );
               })}
             </div>
+            {selectedSkills.length < 2 &&
+              <p className="text-xs text-zinc-500 mt-4 text-center">
+                Первые два навыка должны быть основаны на ваших высших характеристиках: <strong className="text-zinc-400">{eligibleAttributesForFirstSkills.map(attr => DND_ATTRIBUTE_NAMES_RU[attr]).join(', ') || 'Н/Д'}</strong>.
+              </p>
+            }
           </SectionPanel>
 
           <SectionPanel title="Черты и Изъяны">
-             <p className="text-sm text-slate-400 mb-3">
-              Некоторые черты и изъяны активируются автоматически при выполнении требований по итоговым характеристикам. Другие изъяны (без требований) можно выбрать для получения Очков Модификации.
+             <p className="text-sm text-zinc-400 text-center">
+              Некоторые черты/изъяны активируются автоматически. Другие изъяны можно выбрать для получения Очков Модификации.
             </p>
             <div className="space-y-3">
               {AVAILABLE_FEATS.map(feat => {
                 const isStatRequirementMet = checkFeatRequirements(feat, finalAttributes); 
-                const isAutoActiveBeneficial = !feat.isFlaw && feat.requirements.length > 0 && isStatRequirementMet;
-                const isAutoActiveStatFlaw = feat.isFlaw && feat.requirements.length > 0 && isStatRequirementMet;
+                const isAutoActive = !feat.isFlaw && feat.requirements.length > 0 && isStatRequirementMet;
+                const isAutoFlaw = feat.isFlaw && feat.requirements.length > 0 && isStatRequirementMet;
                 const isChosenManualFlaw = feat.isFlaw && feat.requirements.length === 0 && selectedFlawFeats.some(cf => cf.id === feat.id);
                 
-                const isActive = isAutoActiveBeneficial || isAutoActiveStatFlaw || isChosenManualFlaw;
-                let displayClass = 'bg-slate-700/40';
-                let icon = <XCircleIcon className="text-slate-500" />;
-
-                if (isActive) {
-                  if (feat.isFlaw) {
-                    displayClass = 'bg-yellow-700/30 border-l-4 border-yellow-500'; 
-                    icon = <ShieldExclamationIcon className="text-yellow-400" />;
-                  } else {
-                    displayClass = 'bg-green-700/30 border-l-4 border-green-500'; 
-                    icon = <CheckCircleIcon className="text-green-400" />;
-                  }
-                } else if (feat.requirements.length > 0 && !isStatRequirementMet) {
-                     icon = <XCircleIcon className="text-slate-500" />;
-                }
-
-
+                const isActive = isAutoActive || isAutoFlaw || isChosenManualFlaw;
                 const canBeManuallyChosenFlaw = feat.isFlaw && feat.requirements.length === 0;
 
                 return (
-                  <div key={feat.id} className={'p-3 rounded-md ' + displayClass}>
-                    <div className="flex items-center justify-between">
-                        <h5 className={'font-semibold ' + (isActive ? (feat.isFlaw ? 'text-yellow-300' : 'text-green-300') : 'text-slate-200')}>{feat.name}</h5>
-                        <div className="flex items-center">
-                          {canBeManuallyChosenFlaw && (
-                            <input
-                              type="checkbox"
-                              checked={isChosenManualFlaw}
-                              onChange={() => handleToggleFlawFeat(feat)}
-                              className="form-checkbox h-5 w-5 text-yellow-500 bg-slate-600 border-slate-500 rounded focus:ring-yellow-600 cursor-pointer mr-3"
-                              aria-label={'Выбрать изъян ' + feat.name}
-                            />
-                          )}
-                          {icon}
+                  <div key={feat.id} className={`p-4 rounded-2xl transition-colors
+                    ${isActive && !feat.isFlaw ? 'bg-emerald-900/40 border border-emerald-800' : ''}
+                    ${isActive && feat.isFlaw ? 'bg-amber-900/40 border border-amber-800' : ''}
+                    ${!isActive ? 'bg-zinc-800/50 border border-transparent' : ''}
+                  `}>
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1 pr-4">
+                            <h5 className={`font-semibold ${isActive ? (feat.isFlaw ? 'text-amber-300' : 'text-emerald-300') : 'text-zinc-200'}`}>{feat.name}</h5>
+                            <p className="text-sm text-zinc-400 mt-1">{feat.description}</p>
+                            {feat.requirements.length > 0 && (
+                            <p className="text-xs text-zinc-500 mt-1">
+                                Требуется: {feat.requirements.map(r => 
+                                    `${DND_ATTRIBUTE_NAMES_RU[r.attribute]} ${r.minValue ?? ''}${r.minValue ? '+' : ''}${r.maxValue ?? ''}${r.maxValue ? '-' : ''}`
+                                ).join(', ')}
+                                {!isStatRequirementMet && <span className="text-rose-500 ml-1">(Неактивно)</span>}
+                            </p>
+                            )}
                         </div>
+                        {canBeManuallyChosenFlaw && (
+                          <input
+                            type="checkbox" checked={isChosenManualFlaw} onChange={() => handleToggleFlawFeat(feat)}
+                            className="form-checkbox h-5 w-5 mt-1 flex-shrink-0"
+                            aria-label={`Выбрать изъян ${feat.name}`}
+                          />
+                        )}
                     </div>
-                    <p className="text-sm text-slate-300 mt-1">{feat.description}</p>
-                    {feat.requirements.length > 0 && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Требуется: {feat.requirements.map(r => 
-                            DND_ATTRIBUTE_NAMES_RU[r.attribute] + ' ' + 
-                            (r.minValue !== undefined ? r.minValue + '+' : '') + 
-                            (r.maxValue !== undefined ? r.maxValue + '-' : '')
-                        ).join(', ')}
-                        {!isStatRequirementMet && <span className="text-red-400 ml-1">({feat.isFlaw ? 'Условие для изъяна не выполнено' : 'Неактивно'})</span>}
-                      </p>
-                    )}
-                    {canBeManuallyChosenFlaw && isChosenManualFlaw && feat.modificationPointAdjustment && feat.modificationPointAdjustment > 0 && (
-                      <p className="text-xs mt-0.5 text-green-400">
-                        Дает ОМ: {feat.modificationPointAdjustment}
-                      </p>
-                    )}
-                    {!feat.isFlaw && feat.modificationPointAdjustment && feat.modificationPointAdjustment < 0 && isActive && (
-                       <p className="text-xs mt-0.5 text-yellow-400">
-                        Стоит ОМ: {Math.abs(feat.modificationPointAdjustment)}
-                      </p>
-                    )}
                   </div>
                 );
               })}
             </div>
           </SectionPanel>
           
-          <SectionPanel title="Психическое Состояние (Опциональный Изъян для Очков Модификации)">
+          <SectionPanel title="Психическое Состояние">
              <DropdownSelect
-                label="Начальный Эффект Безумия"
+                label="Начальный Эффект Безумия (Опциональный Изъян для ОМ)"
                 value={selectedMadness?.id || "none"}
                 options={madnessDropdownOptions}
                 onChange={handleMadnessChange}
                 getOptionValue={(option: MadnessOption) => option.id}
                 getOptionLabel={(option: MadnessOption) => 
-                  option.name + ' (' + (option.modificationPointAdjustment === 0 && option.id !== "none" ? '+0' : (option.modificationPointAdjustment < 0 ? '+' + (option.modificationPointAdjustment * -1) : '0') ) + ' ОМ)'
+                  `${option.name} (${option.modificationPointAdjustment < 0 ? `+${option.modificationPointAdjustment * -1}` : '0' } ОМ)`
                 }
                 id="madness-select"
               />
               {selectedMadness && selectedMadness.id !== "none" && (
-                <div className="p-2 bg-slate-700/30 rounded text-sm text-slate-300">
-                    <p><strong>Тип:</strong> {selectedMadness.type === "short-term" ? "краткосрочное" : selectedMadness.type === "long-term" ? "долгосрочное" : "бессрочное"}</p>
+                <div className="p-3 bg-zinc-800/50 rounded-xl text-sm text-zinc-300">
                     <p><strong>Эффект:</strong> {selectedMadness.description}</p>
                 </div>
               )}
           </SectionPanel>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
             <button
                 onClick={handleSaveCharacter}
-                className="w-full px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-2xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedRace || attributeBuyPoints < 0 || modificationPoints < 0 || (selectedSkills.length !== MAX_SKILL_PROFICIENCIES && MAX_SKILL_PROFICIENCIES > 0)}
-                aria-disabled={!selectedRace || attributeBuyPoints < 0 || modificationPoints < 0 || (selectedSkills.length !== MAX_SKILL_PROFICIENCIES && MAX_SKILL_PROFICIENCIES > 0)}
               >
-                Создать Персонажа (Сохранить в Файл)
+                Создать и Сохранить Персонажа
             </button>
-             <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleLoadCharacterFile} 
-                accept=".json" 
-                style={{ display: 'none' }} 
-            />
+             <input type="file" ref={fileInputRef} onChange={handleLoadCharacterFile} accept=".json" style={{ display: 'none' }} />
             <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150"
+                className="w-full px-6 py-4 bg-zinc-700 hover:bg-zinc-600 text-white font-semibold rounded-2xl shadow-lg transition-colors"
             >
-                Загрузить Персонажа (из Файла)
+                Загрузить Персонажа
             </button>
           </div>
-
+          <div className="text-center">
+            <button onClick={() => setShowSummary(true)} className="text-zinc-400 hover:text-zinc-200 transition-colors py-2 px-4 text-sm">Предпросмотр Итогового Листа</button>
+          </div>
         </div>
       ) : (
-        <div className="w-full max-w-3xl">
+        <div className="w-full max-w-4xl">
           <CharacterSummary character={currentCharacter} derivedStats={derivedStats} />
           <button
-            onClick={resetCreator}
-            className="w-full px-6 py-3 mt-8 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150"
+            onClick={() => {
+              setShowSummary(false);
+              resetCreator();
+            }}
+            className="w-full px-6 py-4 mt-8 bg-rose-800 hover:bg-rose-700 text-white font-semibold rounded-2xl shadow-lg transition-colors"
           >
-            Создать Еще Одну Потерянную Душу
+            Создать Нового Персонажа
           </button>
+            <button onClick={() => setShowSummary(false)} className="w-full text-zinc-400 hover:text-zinc-200 transition-colors py-2 px-4 text-sm mt-2">
+                Вернуться к Редактированию
+            </button>
         </div>
       )}
-      <footer className="mt-12 text-center text-sm text-slate-500">
-        <p>&copy; {new Date().getFullYear()} Генезис Диких Земель. Вдохновлено Бессмертным Преподобным.</p>
-        <p>Это фанатский инструмент. Все права на "Бессмертный Преподобный" принадлежат его автору. Концепции D&D являются собственностью Wizards of the Coast.</p>
+      <footer className="mt-12 text-center text-sm text-zinc-600">
+          
       </footer>
     </div>
   );
