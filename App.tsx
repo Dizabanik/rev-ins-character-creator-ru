@@ -75,6 +75,14 @@ const App = (): JSX.Element => {
   
   const defaultRace = AVAILABLE_RACES.find(r => r.id === 'human') || (AVAILABLE_RACES.length > 0 ? AVAILABLE_RACES[0] : undefined);
   const [selectedRace, setSelectedRace] = useState<Race | undefined>(defaultRace);
+  
+  // New appearance state
+  const [age, setAge] = useState<string>('');
+  const [height, setHeight] = useState<string>('');
+  const [weight, setWeight] = useState<string>('');
+  const [eyeColor, setEyeColor] = useState<string>('');
+  const [hairColor, setHairColor] = useState<string>('');
+  const [manualBackstory, setManualBackstory] = useState<string>('');
 
   const [selectedTraits, setSelectedTraits] = useState<Trait[]>([]);
   const [selectedItems, setSelectedItems] = useState<StartingItem[]>([]);
@@ -598,6 +606,12 @@ const App = (): JSX.Element => {
     proficiencyBonus: currentProficiencyBonus,
     attributes: finalAttributes, 
     selectedRace,
+    height,
+    weight,
+    eyeColor,
+    hairColor,
+    age,
+    manualBackstory,
     selectedTraits,
     selectedItems,
     selectedSkills,
@@ -646,6 +660,12 @@ const App = (): JSX.Element => {
         attributeBuyPoints: attributeBuyPoints,
         modificationPoints: modificationPoints,
         selectedRaceId: selectedRace?.id,
+        height: height,
+        weight: weight,
+        eyeColor: eyeColor,
+        hairColor: hairColor,
+        age: age,
+        manualBackstory: manualBackstory,
         selectedTraitIds: selectedTraits.map(t => t.id),
         selectedItemIds: selectedItems.map(i => i.id),
         selectedSkillIds: selectedSkills.map(s => s.id),
@@ -723,6 +743,14 @@ const App = (): JSX.Element => {
             // Set all states in one batch to prevent race conditions with useEffect
             setCharacterName(loadedData.name);
             setCharacterLevel(loadedData.level);
+            
+            setAge(loadedData.age || '');
+            setHeight(loadedData.height || '');
+            setWeight(loadedData.weight || '');
+            setEyeColor(loadedData.eyeColor || '');
+            setHairColor(loadedData.hairColor || '');
+            setManualBackstory(loadedData.manualBackstory || '');
+            
             setBaseAttributes(loadedData.baseAttributes);
             setAttributeBuyPoints(loadedData.attributeBuyPoints);
             // modificationPoints will be recalculated by useEffect
@@ -782,6 +810,14 @@ const App = (): JSX.Element => {
     setSelectedRace(newDefaultRace);
     setBaseAttributes(initialBaseAttributes); 
     setAttributeBuyPoints(INITIAL_ATTRIBUTE_BUY_POINTS);
+    
+    setAge('');
+    setHeight('');
+    setWeight('');
+    setEyeColor('');
+    setHairColor('');
+    setManualBackstory('');
+
     setSelectedTraits([]);
     setSelectedItems([]);
     setSelectedMadness(undefined);
@@ -834,8 +870,8 @@ const App = (): JSX.Element => {
   return (
     <div className="min-h-screen bg-gray-950 text-slate-200 p-4 md:p-8 flex flex-col items-center">
       <header className="mb-8 text-center">
-        <h1 className="text-5xl font-bold text-red-500 tracking-tight">Reverend Insanity</h1>
-        <p className="text-xl text-slate-300">Создатель Персонажей (Телепортирован в мир Преподобного Гу)</p>
+        <h1 className="text-5xl font-bold text-red-500 tracking-tight">Создание Персонажа</h1>
+        <p className="text-xl text-slate-300">Создатель Персонажей (Телепортирован в мир)</p>
       </header>
 
       {!showSummary ? (
@@ -955,7 +991,6 @@ const App = (): JSX.Element => {
                     </div>
                 </div>
             </div>
-             <p className="text-xs text-slate-500 mt-3">Примечание: Эти значения являются концептуальными и основаны на стандартных правилах D&D 5e и элементах мира Reverend Insanity.</p>
           </SectionPanel>
 
           <SectionPanel title="Уровень Персонажа">
@@ -1084,6 +1119,42 @@ const App = (): JSX.Element => {
                   )}
               </div>
             )}
+          </SectionPanel>
+
+          <SectionPanel title="Внешность и Предыстория">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+              <div>
+                  <label htmlFor="characterAge" className="block text-sm font-medium text-slate-300 mb-1">Возраст (в прошлом мире)</label>
+                  <input type="text" id="characterAge" value={age} onChange={(e) => setAge(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. 25 лет"/>
+              </div>
+              <div>
+                  <label htmlFor="characterHeight" className="block text-sm font-medium text-slate-300 mb-1">Рост</label>
+                  <input type="text" id="characterHeight" value={height} onChange={(e) => setHeight(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. 180 см"/>
+              </div>
+              <div>
+                  <label htmlFor="characterWeight" className="block text-sm font-medium text-slate-300 mb-1">Вес</label>
+                  <input type="text" id="characterWeight" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. 75 кг"/>
+              </div>
+              <div className="col-span-1">
+                  <label htmlFor="characterEyeColor" className="block text-sm font-medium text-slate-300 mb-1">Цвет глаз</label>
+                  <input type="text" id="characterEyeColor" value={eyeColor} onChange={(e) => setEyeColor(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. Карие"/>
+              </div>
+              <div className="col-span-2">
+                  <label htmlFor="characterHairColor" className="block text-sm font-medium text-slate-300 mb-1">Волосы</label>
+                  <input type="text" id="characterHairColor" value={hairColor} onChange={(e) => setHairColor(e.target.value)} className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500" placeholder="напр. Короткие, черные"/>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="manualBackstory" className="block text-sm font-medium text-slate-300 mb-1">История персонажа (до телепортации)</label>
+              <textarea
+                  id="manualBackstory"
+                  value={manualBackstory}
+                  onChange={(e) => setManualBackstory(e.target.value)}
+                  rows={6}
+                  className="w-full bg-slate-700/80 border border-slate-600 text-slate-200 rounded-md p-2 focus:ring-red-500 focus:border-red-500"
+                  placeholder="Опишите прошлое вашего персонажа, его жизнь, стремления и то, что он мог делать в момент телепортации..."
+              ></textarea>
+            </div>
           </SectionPanel>
 
           <SectionPanel title="Характеристики">

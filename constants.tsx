@@ -182,15 +182,13 @@ export const AVAILABLE_STARTING_ITEMS: StartingItem[] = [
   { id: "item_pouch_coins", name: "Мешочек с 10 золотыми монетами", description: "Немного валюты из вашего старого мира, здесь может быть бесполезна.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'] },
   
   // --- Equippable Items ---
-  { id: "item_simple_shirt", name: "Простая рубаха", description: "Обычная рубаха из грубой ткани.", modificationPointCost: 1, compatibleSlots: ['underwear'] },
-  { id: "item_leather_armor", name: "Кожаная броня", description: "Простая броня из дубленой кожи. Дает +1 к КБ.", modificationPointCost: 3, compatibleSlots: ['armor'] },
+  { id: "item_leather_armor", name: "Кожаная броня", description: "Простая броня из дубленой кожи. Дает +1 к КБ.", modificationPointCost: 2, compatibleSlots: ['armor'] },
   { id: "item_simple_helmet", name: "Простой шлем", description: "Базовая защита для головы.", modificationPointCost: 1, compatibleSlots: ['head'] },
   { id: "item_sturdy_boots", name: "Крепкие сапоги", description: "Защищают ноги от острых камней и пересеченной местности.", modificationPointCost: 1, compatibleSlots: ['feet'] },
-  { id: "item_cloth_trousers", name: "Тканевые штаны", description: "Простые, но прочные штаны.", modificationPointCost: 1, compatibleSlots: ['legs'] },
   { id: "item_leather_gloves", name: "Кожаные перчатки", description: "Защищают руки и улучшают хват.", modificationPointCost: 1, compatibleSlots: ['hands_L', 'hands_R'] },
-  { id: "item_wool_cloak", name: "Шерстяной плащ", description: "Плащ, который защищает от непогоды.", modificationPointCost: 2, compatibleSlots: ['shoulder_L'] },
+  { id: "item_wool_cloak", name: "Шерстяной плащ", description: "Плащ, который защищает от непогоды.", modificationPointCost: 1, compatibleSlots: ['shoulder_L'] },
   { id: "item_simple_bag", name: "Простая сумка", description: "Небольшая сумка через плечо для мелочей.", modificationPointCost: 1, compatibleSlots: ['shoulder_L', 'shoulder_R'] },
-  { id: "item_short_sword", name: "Короткий меч", description: "Надежный короткий меч. Режущее оружие.", modificationPointCost: 3, compatibleSlots: ['mainHand', 'offHand', 'leg_weapon_L', 'leg_weapon_R'] },
+  { id: "item_short_sword", name: "Короткий меч", description: "Надежный короткий меч. Режущее оружие.", modificationPointCost: 2, compatibleSlots: ['mainHand', 'offHand', 'leg_weapon_L', 'leg_weapon_R'] },
   { id: "item_wooden_ring", name: "Деревянное кольцо", description: "Простое кольцо из дерева. Возможно, имеет сентиментальную ценность.", modificationPointCost: 0, compatibleSlots: ['ring_L1', 'ring_L2', 'ring_L3', 'ring_R1', 'ring_R2', 'ring_R3'] },
   { id: "item_leather_bracelet", name: "Кожаный браслет", description: "Простой браслет из кожи.", modificationPointCost: 0, compatibleSlots: ['bracelet_L', 'bracelet_R'] },
   { id: "item_string_amulet", name: "Амулет на веревке", description: "Простой камень, висящий на веревке.", modificationPointCost: 0, compatibleSlots: ['amulet', 'amulet2'] },

@@ -32,7 +32,16 @@ export interface Character {
   modificationPoints: number; 
   level: number;
   proficiencyBonus: number; 
-  backstory?: string;
+  backstory?: string; // AI-generated backstory
+  
+  // New appearance and background fields
+  height: string;
+  weight: string;
+  eyeColor: string;
+  hairColor: string;
+  age: string;
+  manualBackstory: string; // User-written backstory
+
   // Aperture related fields
   apertureGradeId?: string;
   characterRankId?: string;
@@ -217,6 +226,14 @@ export interface CharacterSaveData {
   selectedFlawFeatIds: string[];
   madnessEffectId?: string;
   backstory?: string;
+  
+  height?: string;
+  weight?: string;
+  eyeColor?: string;
+  hairColor?: string;
+  age?: string;
+  manualBackstory?: string;
+
   apertureGradeId?: string;
   characterRankId?: string;
   selectedEssenceStageId?: EssenceStageId;

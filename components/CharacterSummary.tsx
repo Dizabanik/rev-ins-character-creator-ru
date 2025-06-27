@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { Character } from '../types';
 import SectionPanel from './SectionPanel';
@@ -59,6 +57,32 @@ const CharacterSummary: React.FC<CharacterSummaryProps> = ({ character, derivedS
           </p>
           <p className="text-sm text-slate-400 mt-1">Текущее игровое время: <ClockIcon className="inline h-4 w-4 mr-1 text-sky-400" /> {formatGameTime(character.gameTimeHours)}</p>
         </div>
+
+        {(character.age || character.height || character.weight || character.eyeColor || character.hairColor) && (
+          <div>
+            <h4 className="text-lg font-semibold text-slate-200 mb-2 flex items-center">
+              <UserCircleIcon className="mr-2 text-red-400" />
+              Внешность
+            </h4>
+            <div className="p-3 bg-slate-800/50 rounded-md shadow grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-sm">
+              {character.age && <p><strong className="text-slate-300">Возраст:</strong> <span className="text-slate-200">{character.age}</span></p>}
+              {character.height && <p><strong className="text-slate-300">Рост:</strong> <span className="text-slate-200">{character.height}</span></p>}
+              {character.weight && <p><strong className="text-slate-300">Вес:</strong> <span className="text-slate-200">{character.weight}</span></p>}
+              {character.eyeColor && <p><strong className="text-slate-300">Цвет глаз:</strong> <span className="text-slate-200">{character.eyeColor}</span></p>}
+              {character.hairColor && <p><strong className="text-slate-300">Волосы:</strong> <span className="text-slate-200">{character.hairColor}</span></p>}
+            </div>
+          </div>
+        )}
+
+        {character.manualBackstory && (
+          <div>
+            <h4 className="text-lg font-semibold text-slate-200 mb-2 flex items-center">
+              <BookOpenIcon className="mr-2 text-red-400" />
+              Предыстория (до телепортации)
+            </h4>
+            <p className="text-sm text-slate-300 whitespace-pre-wrap bg-slate-700/30 p-4 rounded-md shadow-inner">{character.manualBackstory}</p>
+          </div>
+        )}
 
         {/* HP and HD display */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -294,7 +318,7 @@ const CharacterSummary: React.FC<CharacterSummaryProps> = ({ character, derivedS
 
         {character.backstory && (
           <div>
-            <h4 className="text-lg font-semibold text-slate-200 mt-2">Сгенерированная Хроника:</h4>
+            <h4 className="text-lg font-semibold text-slate-200 mt-2">Сгенерированная Хроника (ИИ):</h4>
             <p className="text-sm text-slate-300 whitespace-pre-wrap bg-slate-700/30 p-4 rounded-md shadow-inner">{character.backstory}</p>
           </div>
         )}
