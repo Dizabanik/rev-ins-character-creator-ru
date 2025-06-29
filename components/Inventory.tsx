@@ -1,20 +1,19 @@
 
-
-
-import React, { useState, useCallback, useMemo } from 'react';
-import { EquipmentSlots, InventoryItem, StartingItem, EquipmentSlotId, Character } from '../types';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { EquipmentSlots, InventoryItem, StartingItem, EquipmentSlotId, WeaponProperties, Character, Rarity, ArmorType } from '../types';
 import { 
     AVAILABLE_STARTING_ITEMS, 
     EQUIPMENT_SLOT_IDS, 
     EQUIPMENT_SLOT_NAMES_RU,
     HeadSlotIcon, ChestSlotIcon, LegsSlotIcon, FeetSlotIcon, HandsSlotIcon, 
     WeaponSlotIcon, RingSlotIcon, AmuletSlotIcon, ShoulderBagIcon, 
-    BackpackIcon, UnderwearSlotIcon, BraceletSlotIcon, PouchSlotIcon, PlusIcon
+    BackpackIcon, UnderwearSlotIcon, BraceletSlotIcon, PouchSlotIcon, PlusIcon,
+    WEAPON_PROPERTY_DEFINITIONS, WeaponPropertyDefinition, RARITY_COLORS, ArmorClassIcon
 } from '../constants';
-import AddCustomItemModal from './AddCustomItemModal';
 
 interface ItemTooltipInfo {
   item: StartingItem;
+  instanceId: string;
   x: number;
   y: number;
 }
@@ -24,6 +23,7 @@ interface InventoryProps {
   equipment: EquipmentSlots;
   backpack: InventoryItem[];
   onItemDrop: (data: { instanceId: string; source: EquipmentSlotId | 'backpack' }, targetSlot: EquipmentSlotId | 'backpack') => void;
+  onItemDelete: (instanceId: string) => void;
   onCreateCustomItem: () => void;
 }
 
@@ -52,10 +52,10 @@ const CharacterBodySvg: React.FC = () => (
 
 const slotPositions: Record<EquipmentSlotId, string> = {
     head: 'top-[3%] left-1/2 -translate-x-1/2',
-    amulet: 'top-[19%] left-[36%]',
-    amulet2: 'top-[19%] right-[36%]',
-    shoulder_L: 'top-[24%] left-[17%]',
-    shoulder_R: 'top-[24%] right-[17%]',
+    amulet: 'top-[19%] left-[36%] -translate-x-1/2',
+    amulet2: 'top-[19%] right-[36%] translate-x-1/2',
+    shoulder_L: 'top-[24%] left-[17%] -translate-x-1/2',
+    shoulder_R: 'top-[24%] right-[17%] translate-x-1/2',
     underwear: 'top-[32%] left-1/2 -translate-x-1/2',
     armor: 'top-[46%] left-1/2 -translate-x-1/2',
     legs: 'top-[68%] left-1/2 -translate-x-1/2',
@@ -64,25 +64,23 @@ const slotPositions: Record<EquipmentSlotId, string> = {
     offHand: 'top-[45%] left-[2%]',
     mainHand: 'top-[45%] right-[2%]',
     
-    bracelet_L: 'top-[55%] left-[14%]',
-    hands_L: 'top-[75%] left-[14%]',
-    ring_L1: 'top-[70%] left-[2%]',
-    ring_L2: 'top-[78%] left-[2%]',
-    ring_L3: 'top-[86%] left-[2%]',
-
-    bracelet_R: 'top-[55%] right-[14%]',
-    hands_R: 'top-[75%] right-[14%]',
-    ring_R1: 'top-[70%] right-[2%]',
-    ring_R2: 'top-[78%] right-[2%]',
-    ring_R3: 'top-[86%] right-[2%]',
-    
-    leg_weapon_L: 'top-[70%] left-[28%]',
-    leg_weapon_R: 'top-[70%] right-[28%]',
-    leg_pouch_L: 'top-[85%] left-[28%]',
-    leg_pouch_R: 'top-[85%] right-[28%]',
+    bracelet_L: 'top-[70%] left-[12%]',
+    bracelet_R: 'top-[70%] right-[12%]',
+    hands_L: 'top-[78%] left-[8%]',
+    hands_R: 'top-[78%] right-[8%]',
+    ring_L1: 'top-[38%] left-[12%]',
+    ring_L2: 'top-[48%] left-[12%]',
+    ring_L3: 'top-[58%] left-[12%]',
+    ring_R1: 'top-[38%] right-[12%]',
+    ring_R2: 'top-[48%] right-[12%]',
+    ring_R3: 'top-[58%] right-[12%]',
+    leg_weapon_L: 'top-[65%] left-[25%]',
+    leg_weapon_R: 'top-[65%] right-[25%]',
+    leg_pouch_L: 'top-[78%] left-[26%]',
+    leg_pouch_R: 'top-[78%] right-[26%]',
 };
 
-const slotIcons: Record<EquipmentSlotId, React.FC<{className?: string}>> = {
+const slotIcons: Record<EquipmentSlotId, React.FC<{ className?: string }>> = {
     head: HeadSlotIcon,
     armor: ChestSlotIcon,
     underwear: UnderwearSlotIcon,
@@ -110,180 +108,285 @@ const slotIcons: Record<EquipmentSlotId, React.FC<{className?: string}>> = {
     leg_pouch_R: PouchSlotIcon,
 };
 
-const ItemTooltip: React.FC<{ tooltipInfo: ItemTooltipInfo | null }> = ({ tooltipInfo }) => {
-  if (!tooltipInfo) return null;
-
-  return (
-    <div
-      className="fixed z-50 p-3 bg-zinc-950/80 backdrop-blur-sm border border-indigo-500 rounded-lg shadow-xl max-w-xs text-sm"
-      style={{ left: tooltipInfo.x + 15, top: tooltipInfo.y + 15 }}
-    >
-      <h4 className="font-bold text-indigo-400">{tooltipInfo.item.name}</h4>
-      <p className="text-zinc-300">{tooltipInfo.item.description}</p>
-      {tooltipInfo.item.weight !== undefined && <p className="text-xs text-zinc-400 mt-1">Вес: {tooltipInfo.item.weight}</p>}
-    </div>
-  );
+const getRarityClasses = (rarity: Rarity) => {
+    return RARITY_COLORS[rarity] || RARITY_COLORS.common;
 };
 
-const Inventory: React.FC<InventoryProps> = ({ character, equipment, backpack, onItemDrop, onCreateCustomItem }) => {
-    const [tooltipInfo, setTooltipInfo] = useState<ItemTooltipInfo | null>(null);
-    const [draggedItemCompatibleSlots, setDraggedItemCompatibleSlots] = useState<EquipmentSlotId[]>([]);
+const ARMOR_TYPE_NAMES: Record<ArmorType, string> = {
+    light: 'Лёгкий',
+    medium: 'Средний',
+    heavy: 'Тяжёлый'
+};
 
-    const itemLookup = useMemo(() => {
-        const allItems = [...AVAILABLE_STARTING_ITEMS, ...(character.customItems || [])];
-        return new Map(allItems.map(item => [item.id, item]));
-    }, [character.customItems]);
+const ItemTooltip: React.FC<{ info: ItemTooltipInfo | null }> = ({ info }) => {
+    if (!info) return null;
+    const { item, x, y } = info;
+    const rarityClasses = getRarityClasses(item.rarity || 'common');
     
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, instanceId: string, source: EquipmentSlotId | 'backpack') => {
-        const itemInstance = source === 'backpack' ? backpack.find(i => i.instanceId === instanceId) : equipment[source];
-        const baseItem = itemInstance ? itemLookup.get(itemInstance.itemId) : undefined;
-        
-        setDraggedItemCompatibleSlots(baseItem?.compatibleSlots || []);
-        e.dataTransfer.setData('application/json', JSON.stringify({ instanceId, source }));
-        e.dataTransfer.effectAllowed = 'move';
-        setTooltipInfo(null);
-    };
-
-    const handleDragEnd = () => {
-        setDraggedItemCompatibleSlots([]);
-    };
-
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    };
-
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetSlot: EquipmentSlotId | 'backpack') => {
-        e.preventDefault();
-        setDraggedItemCompatibleSlots([]);
-        
-        try {
-            const data = JSON.parse(e.dataTransfer.getData('application/json'));
-            if (data.instanceId && data.source) {
-                onItemDrop(data, targetSlot);
-            }
-        } catch (error) {
-            console.error("Failed to parse drag data", error);
-        }
-    };
-
-    const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>, itemInstance: InventoryItem) => {
-        e.preventDefault();
-        const baseItem = itemLookup.get(itemInstance.itemId);
-        if (baseItem) {
-          setTooltipInfo({ item: baseItem, x: e.clientX, y: e.clientY });
-        }
-    };
-
-    const closeTooltip = useCallback(() => {
-        setTooltipInfo(null);
-    }, []);
-
-    React.useEffect(() => {
-        window.addEventListener('click', closeTooltip);
-        window.addEventListener('scroll', closeTooltip);
-        return () => {
-            window.removeEventListener('click', closeTooltip);
-            window.removeEventListener('scroll', closeTooltip);
-        };
-    }, [closeTooltip]);
-
-    const renderItem = (itemInstance: InventoryItem, source: EquipmentSlotId | 'backpack') => {
-        const item = itemLookup.get(itemInstance.itemId);
-        if (!item) return null;
-
-        return (
-            <div
-                key={itemInstance.instanceId}
-                draggable
-                onDragStart={(e) => handleDragStart(e, itemInstance.instanceId, source)}
-                onDragEnd={handleDragEnd}
-                onContextMenu={(e) => handleContextMenu(e, itemInstance)}
-                className="w-full h-full bg-zinc-700/80 border-2 border-zinc-600 rounded-lg flex items-center justify-center cursor-move p-1 text-center text-[10px] leading-tight text-zinc-100 font-semibold shadow-inner hover:border-indigo-400 transition-colors"
-                title={item.name}
-            >
-                {item.name}
-            </div>
-        );
-    };
-
-    const renderSlot = (slotId: EquipmentSlotId) => {
-        const itemInstance = equipment[slotId];
-        const isCompatible = draggedItemCompatibleSlots.includes(slotId);
-        const SlotIcon = slotIcons[slotId];
-        
-        const mainHandItemInstance = equipment.mainHand;
-        const mainHandItemDef = mainHandItemInstance ? itemLookup.get(mainHandItemInstance.itemId) : null;
-        const mainHandIsTwoHanded = !!(mainHandItemDef?.compatibleSlots?.includes('mainHand') && !mainHandItemDef.compatibleSlots.includes('offHand'));
-
-        const isDisabledByRace = character.selectedRace?.id === 'merman' && slotId === 'feet';
-        const isBlockedByWeapon = slotId === 'offHand' && mainHandIsTwoHanded;
-        const isDisabled = isDisabledByRace || isBlockedByWeapon;
-
-        let disabledTitle = '';
-        if (isDisabledByRace) disabledTitle = ' (Заблокировано для Мерфолка)';
-        if (isBlockedByWeapon) disabledTitle = ' (Заблокировано двуручным оружием)';
-
-        return (
-            <div
-                key={slotId}
-                onDragOver={isDisabled ? undefined : handleDragOver}
-                onDrop={isDisabled ? undefined : (e) => handleDrop(e, slotId)}
-                className={`absolute w-12 h-12 bg-zinc-900/50 border-2 border-dashed border-zinc-700 rounded-lg flex items-center justify-center transition-all duration-150 ${slotPositions[slotId]} ${
-                    isCompatible && !isDisabled ? 'border-indigo-500 bg-indigo-900/50 ring-2 ring-indigo-400' : ''
-                } ${
-                    isDisabled ? 'opacity-40 cursor-not-allowed bg-rose-900/50 border-rose-800' : 'hover:border-indigo-500'
-                }`}
-                title={EQUIPMENT_SLOT_NAMES_RU[slotId] + disabledTitle}
-            >
-                {itemInstance ? renderItem(itemInstance, slotId) : (
-                    <SlotIcon className="w-7 h-7 text-zinc-600" />
-                )}
-            </div>
-        );
-    };
-
-  return (
-    <>
-      <ItemTooltip tooltipInfo={tooltipInfo} />
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Equipment Doll */}
-        <div className="flex-shrink-0 w-full lg:w-[420px] h-[600px] relative mx-auto">
-            <CharacterBodySvg />
-            {EQUIPMENT_SLOT_IDS.map(slotId => renderSlot(slotId))}
-        </div>
-
-        {/* Backpack */}
-        <div className="flex-grow">
-          <div className="flex justify-between items-center mb-3">
-            <h4 className="text-lg font-semibold text-zinc-200 flex items-center">
-                <BackpackIcon className="mr-2"/> Рюкзак
-            </h4>
-            <button
-                onClick={onCreateCustomItem} 
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600/50 hover:bg-indigo-600/80 text-indigo-200 font-semibold rounded-lg text-sm transition-colors"
-            >
-                <PlusIcon />
-                Добавить свой предмет
-            </button>
-          </div>
-          <div
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, 'backpack')}
-            className="w-full min-h-48 p-3 bg-zinc-800/50 border-2 border-dashed border-zinc-700 rounded-2xl flex flex-wrap gap-2 content-start"
-          >
-            {backpack.length > 0 ? (
-                backpack.map(item => <div key={item.instanceId} className="w-14 h-14">{renderItem(item, 'backpack')}</div>)
-            ) : (
-                <div className="w-full text-center text-zinc-500 italic p-4">
-                    Рюкзак пуст.
+    return (
+        <div 
+            className={`fixed p-4 rounded-xl shadow-lg border backdrop-blur-sm max-w-xs z-50 pointer-events-none ${rarityClasses.bg} ${rarityClasses.border}`}
+            style={{ left: x + 15, top: y + 15 }}
+        >
+            <h3 className={`font-bold text-lg ${rarityClasses.text}`}>{item.name}</h3>
+            {item.description && <p className="text-sm text-zinc-300 mt-2">{item.description}</p>}
+            
+            {(item.baseArmorClass != null || item.armorType) && (
+                <div className="mt-3 pt-3 border-t border-zinc-600/50 space-y-1 text-sm">
+                    {item.baseArmorClass != null && <p><strong className="text-zinc-400">Базовый КБ:</strong> {item.baseArmorClass}</p>}
+                    {item.armorType && <p><strong className="text-zinc-400">Тип:</strong> {ARMOR_TYPE_NAMES[item.armorType]}</p>}
                 </div>
             )}
-          </div>
+
+            {(item.damageDice || item.properties) && (
+                 <div className="mt-3 pt-3 border-t border-zinc-600/50 space-y-1 text-sm">
+                    {item.damageDice && <p><strong className="text-zinc-400">Урон:</strong> {item.damageDice} {item.damageType}</p>}
+                    {item.properties && (
+                         <p><strong className="text-zinc-400">Свойства:</strong> {Object.entries(item.properties).map(([key, value]) => {
+                            const def = WEAPON_PROPERTY_DEFINITIONS.find(p => p.id === key);
+                            if (!def) return null;
+                            if (typeof value === 'boolean') return def.name;
+                            if (typeof value === 'object' && value.normal) return `${def.name} (${value.normal}/${value.max})`;
+                            return `${def.name} (${value})`;
+                         }).filter(Boolean).join(', ')}</p>
+                    )}
+                 </div>
+            )}
+            <div className="mt-3 pt-3 border-t border-zinc-600/50 flex justify-between items-center text-xs">
+                 <span className={`${rarityClasses.text} font-semibold capitalize`}>{item.rarity}</span>
+                 {item.weight != null && <span className="text-zinc-400">Вес: {item.weight}</span>}
+            </div>
         </div>
-      </div>
-    </>
-  );
+    );
+};
+
+
+interface EquipmentSlotProps {
+    slotId: EquipmentSlotId;
+    itemInstance: InventoryItem | null;
+    allItemsLookup: Map<string, StartingItem>;
+    isDropTarget: boolean;
+    isCompatible?: boolean;
+    onDragStart: (e: React.DragEvent, instanceId: string, itemId: string, source: EquipmentSlotId) => void;
+    onDragOver: (e: React.DragEvent) => void;
+    onDrop: (e: React.DragEvent, targetSlot: EquipmentSlotId) => void;
+    onDragEnter: (e: React.DragEvent) => void;
+    onDragLeave: (e: React.DragEvent) => void;
+    onMouseEnter: (e: React.MouseEvent, item: StartingItem, instanceId: string) => void;
+    onMouseLeave: () => void;
+    onContextMenu: (e: React.MouseEvent, instanceId: string) => void;
+    isDisabled?: boolean;
+}
+
+const EquipmentSlot: React.FC<EquipmentSlotProps> = ({ slotId, itemInstance, allItemsLookup, isDropTarget, isCompatible, onDragStart, onDragOver, onDrop, onDragEnter, onDragLeave, onMouseEnter, onMouseLeave, onContextMenu, isDisabled }) => {
+    const itemDef = itemInstance ? allItemsLookup.get(itemInstance.itemId) : null;
+    const SlotIcon = slotIcons[slotId];
+    const rarityClasses = itemDef ? getRarityClasses(itemDef.rarity || 'common') : getRarityClasses('common');
+
+    const canEquip = !itemDef || !itemDef.compatibleSlots || itemDef.compatibleSlots.includes(slotId);
+
+    const slotStyleClasses = `
+        absolute w-14 h-14 bg-zinc-800/60 border-2 rounded-xl flex items-center justify-center transition-all duration-200
+        ${slotPositions[slotId]}
+        ${isDisabled 
+            ? 'opacity-50 cursor-not-allowed bg-rose-900/40 border-rose-700/80' 
+            : (isDropTarget 
+                ? 'border-green-500 scale-110 bg-green-900/50' 
+                : (isCompatible 
+                    ? 'border-sky-500/50 shadow-lg shadow-sky-500/40' 
+                    : (canEquip ? 'border-zinc-700 hover:border-zinc-500' : 'border-rose-700')))}
+        ${itemDef && !isDisabled ? `${rarityClasses.border} ${rarityClasses.bg}` : ''}`;
+    
+    return (
+        <div 
+            className={slotStyleClasses}
+            onDragOver={isDisabled ? undefined : onDragOver}
+            onDrop={isDisabled ? undefined : (e => onDrop(e, slotId))}
+            onDragEnter={isDisabled ? undefined : onDragEnter}
+            onDragLeave={isDisabled ? undefined : onDragLeave}
+        >
+            {itemDef && itemInstance ? (
+                <div
+                    draggable={!isDisabled}
+                    onDragStart={isDisabled ? undefined : (e) => onDragStart(e, itemInstance.instanceId, itemDef.id, slotId)}
+                    className="w-full h-full p-1 cursor-grab active:cursor-grabbing flex items-center justify-center"
+                    onMouseEnter={isDisabled ? undefined : (e) => onMouseEnter(e, itemDef, itemInstance.instanceId)}
+                    onMouseLeave={isDisabled ? undefined : onMouseLeave}
+                    onContextMenu={isDisabled ? undefined : e => onContextMenu(e, itemInstance.instanceId)}
+                >
+                     <p className={`text-xs text-center leading-tight font-semibold px-1 ${isDisabled ? 'text-rose-300/70' : rarityClasses.text}`}>{itemDef.name}</p>
+                </div>
+            ) : (
+                <SlotIcon className={`w-8 h-8 ${isDisabled ? 'text-rose-400/50' : 'text-zinc-600'}`} />
+            )}
+             <span className="absolute -bottom-5 text-[10px] text-zinc-500 whitespace-nowrap">{EQUIPMENT_SLOT_NAMES_RU[slotId]}</span>
+        </div>
+    );
+};
+
+const Inventory: React.FC<InventoryProps> = ({ character, equipment, backpack, onItemDrop, onItemDelete, onCreateCustomItem }) => {
+    const [draggedItem, setDraggedItem] = useState<{ instanceId: string; itemId: string; source: EquipmentSlotId | 'backpack' } | null>(null);
+    const [dropTarget, setDropTarget] = useState<EquipmentSlotId | 'backpack' | null>(null);
+    const [tooltip, setTooltip] = useState<ItemTooltipInfo | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ instanceId: string, x: number, y: number } | null>(null);
+    
+    const allItemsLookup = useMemo(() => {
+        const allItems = [...AVAILABLE_STARTING_ITEMS, ...character.customItems];
+        return new Map(allItems.map(item => [item.id, item]));
+    }, [character.customItems]);
+
+    const mainHandItemInstance = equipment.mainHand;
+    const mainHandItemDef = mainHandItemInstance ? allItemsLookup.get(mainHandItemInstance.itemId) : null;
+    const mainHandIsTwoHanded = mainHandItemDef?.properties?.twoHanded ?? false;
+
+
+    const handleDragStart = useCallback((e: React.DragEvent, instanceId: string, itemId: string, source: EquipmentSlotId | 'backpack') => {
+        const itemData = { instanceId, itemId, source };
+        e.dataTransfer.setData('application/json', JSON.stringify(itemData));
+        e.dataTransfer.effectAllowed = 'move';
+        setDraggedItem(itemData);
+    }, []);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    }, []);
+    
+    const handleDrop = useCallback((e: React.DragEvent, targetSlot: EquipmentSlotId | 'backpack') => {
+        e.preventDefault();
+        const data = JSON.parse(e.dataTransfer.getData('application/json'));
+        onItemDrop(data, targetSlot);
+        setDraggedItem(null);
+        setDropTarget(null);
+    }, [onItemDrop]);
+
+    const handleDragEnd = useCallback(() => {
+        setDraggedItem(null);
+        setDropTarget(null);
+    }, []);
+
+    const handleMouseEnter = useCallback((e: React.MouseEvent, item: StartingItem, instanceId: string) => {
+        setTooltip({ item, instanceId, x: e.clientX, y: e.clientY });
+    }, []);
+
+    const handleMouseLeave = useCallback(() => {
+        setTooltip(null);
+    }, []);
+    
+    const handleContextMenu = useCallback((e: React.MouseEvent, instanceId: string) => {
+        e.preventDefault();
+        setContextMenu({ instanceId, x: e.clientX, y: e.clientY });
+    }, []);
+
+    const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+    React.useEffect(() => {
+        if(contextMenu) {
+            document.addEventListener('click', closeContextMenu);
+            return () => document.removeEventListener('click', closeContextMenu);
+        }
+    }, [contextMenu, closeContextMenu]);
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" onDragEnd={handleDragEnd}>
+            <ItemTooltip info={tooltip} />
+            {contextMenu && (
+                <div 
+                    className="fixed bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 py-2"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                >
+                    <button 
+                        onClick={() => { onItemDelete(contextMenu.instanceId); closeContextMenu(); }} 
+                        className="block w-full text-left px-4 py-2 text-sm text-rose-400 hover:bg-rose-500/10"
+                    >
+                        Выбросить предмет
+                    </button>
+                </div>
+            )}
+            {/* Equipment Side */}
+            <div className="lg:col-span-2 bg-zinc-950/30 p-4 rounded-3xl min-h-[40rem] relative">
+                <CharacterBodySvg />
+                {EQUIPMENT_SLOT_IDS.map(slotId => {
+                    const draggedItemDef = draggedItem ? allItemsLookup.get(draggedItem.itemId) : null;
+                    let isCompatible = false;
+                    if (draggedItemDef) {
+                        isCompatible = draggedItemDef.compatibleSlots?.includes(slotId) ?? false;
+                    }
+                    const isDisabled = (character.selectedRace?.id === 'merman' && slotId === 'feet') ||
+                                     (slotId === 'offHand' && mainHandIsTwoHanded);
+
+                    return (
+                        <EquipmentSlot
+                            key={slotId}
+                            slotId={slotId}
+                            itemInstance={equipment[slotId] ?? null}
+                            allItemsLookup={allItemsLookup}
+                            isDropTarget={dropTarget === slotId}
+                            isCompatible={isCompatible}
+                            onDragStart={handleDragStart}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            onDragEnter={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDropTarget(slotId);
+                            }}
+                            onDragLeave={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDropTarget(null);
+                            }}
+                            onMouseEnter={(e, item, instanceId) => {
+                                setTooltip({ item, instanceId, x: e.clientX, y: e.clientY });
+                            }}
+                            onMouseLeave={handleMouseLeave}
+                            onContextMenu={handleContextMenu}
+                            isDisabled={isDisabled}
+                        />
+                    );
+                })}
+            </div>
+
+            {/* Backpack Side */}
+            <div 
+                className={`p-4 bg-zinc-900/50 rounded-3xl border-2 ${dropTarget === 'backpack' ? 'border-green-500' : 'border-transparent'} transition-colors`}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, 'backpack')}
+                onDragEnter={() => setDropTarget('backpack')}
+                onDragLeave={() => setDropTarget(null)}
+            >
+                <h3 className="text-xl font-semibold text-zinc-300 mb-4 flex items-center"><BackpackIcon className="mr-2"/> Рюкзак</h3>
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 gap-3">
+                    {backpack.map(itemInstance => {
+                        const itemDef = allItemsLookup.get(itemInstance.itemId);
+                        if (!itemDef) return null;
+                        const rarityClasses = getRarityClasses(itemDef.rarity || 'common');
+                        
+                        return (
+                            <div 
+                                key={itemInstance.instanceId}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, itemInstance.instanceId, itemDef.id, 'backpack')}
+                                onMouseEnter={(e) => handleMouseEnter(e, itemDef, itemInstance.instanceId)}
+                                onMouseLeave={handleMouseLeave}
+                                onContextMenu={(e) => handleContextMenu(e, itemInstance.instanceId)}
+                                className={`aspect-square p-2 border rounded-lg flex flex-col justify-center items-center cursor-grab active:cursor-grabbing text-center transition-shadow ${rarityClasses.bg} ${rarityClasses.border} hover:shadow-lg`}
+                            >
+                                <p className={`text-xs font-semibold leading-tight ${rarityClasses.text}`}>{itemDef.name}</p>
+                            </div>
+                        );
+                    })}
+                     <button
+                        onClick={onCreateCustomItem}
+                        className="aspect-square border-2 border-dashed border-zinc-700 hover:border-indigo-500 hover:bg-indigo-900/30 text-zinc-600 hover:text-indigo-400 rounded-lg flex flex-col justify-center items-center transition-colors"
+                        aria-label="Добавить новый предмет"
+                    >
+                        <PlusIcon className="w-8 h-8" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export default Inventory;

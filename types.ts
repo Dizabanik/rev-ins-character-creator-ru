@@ -1,5 +1,7 @@
 
 
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'varies';
+
 export type EquipmentSlotId = 
   'head' | 'armor' | 'legs' | 'feet' | 'hands_L' | 'hands_R' | 
   'mainHand' | 'offHand' | 'shoulder_L' | 'shoulder_R' | 'amulet' | 'amulet2' |
@@ -10,6 +12,8 @@ export type EquipmentSlotId =
   'leg_weapon_L' | 'leg_weapon_R' |
   'leg_pouch_L' | 'leg_pouch_R';
 
+export type ArmorType = 'light' | 'medium' | 'heavy';
+
 
 export interface InventoryItem {
     instanceId: string; // Уникальный ID для этого конкретного экземпляра предмета
@@ -18,6 +22,21 @@ export interface InventoryItem {
 
 export type EquipmentSlots = Partial<Record<EquipmentSlotId, InventoryItem | null>>;
 
+export type DamageType = 'не указан' | 'дробящий' | 'колющий' | 'рубящий';
+
+export interface WeaponProperties {
+  ammunition?: boolean;
+  twoHanded?: boolean;
+  reach?: boolean;
+  range?: { normal: number | null; max: number | null };
+  light?: boolean;
+  thrown?: { normal: number | null; max: number | null };
+  special?: boolean;
+  loading?: boolean;
+  heavy?: boolean;
+  versatile?: string; // e.g., "1d10"
+  finesse?: boolean;
+}
 
 export interface Character {
   name: string;
@@ -114,6 +133,14 @@ export interface StartingItem {
   modificationPointCost: number;
   compatibleSlots?: EquipmentSlotId[];
   weight?: number;
+  rarity?: Rarity;
+  // Weapon properties
+  damageDice?: string;
+  damageType?: DamageType;
+  properties?: WeaponProperties;
+  // Armor properties
+  armorType?: ArmorType;
+  baseArmorClass?: number;
 }
 
 export interface Skill {

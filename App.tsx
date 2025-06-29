@@ -1,6 +1,9 @@
 
+
+
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Character, Attributes, DndAttribute, Trait, StartingItem, MadnessEffect, Skill, Feat, Race, EssenceStageId, ArmorTypeForSleep, CharacterSaveData, EquipmentSlots, InventoryItem, EquipmentSlotId } from './types';
+import { Character, Attributes, DndAttribute, Trait, StartingItem, MadnessEffect, Skill, Feat, Race, EssenceStageId, ArmorTypeForSleep, CharacterSaveData, EquipmentSlots, InventoryItem, EquipmentSlotId, ArmorType } from './types';
 import {
   DND_ATTRIBUTES_KEYS, ATTRIBUTE_BASE_SCORE, INITIAL_ATTRIBUTE_BUY_POINTS,
   INITIAL_MODIFICATION_POINTS, AVAILABLE_TRAITS, AVAILABLE_STARTING_ITEMS, 
@@ -11,7 +14,7 @@ import {
   ShieldExclamationIcon, parseDerivedStatValue, ListBulletIcon, StarIcon,
   calculateProficiencyBonus, PlusIcon, MinusIcon,
   APERTURE_GRADES, CHARACTER_RANKS, ESSENCE_STAGES, BeakerIcon, DEFAULT_HIT_DIE_TYPE, ARMOR_TYPES_FOR_SLEEP,
-  PencilSquareIcon, HeartIcon, ArmorClassIcon, BackpackIcon
+  PencilSquareIcon, HeartIcon, ArmorClassIcon, BackpackIcon, WEAPON_PROPERTY_DEFINITIONS, ScaleIcon
 } from './constants';
 import SectionPanel from './components/SectionPanel';
 import DropdownSelect from './components/DropdownSelect';
@@ -501,7 +504,7 @@ const App = (): JSX.Element => {
     let newEquipment = { ...equipment };
     let newBackpack = [...backpack];
 
-    // Find item being moved
+    // Find and remove item from source
     let itemToMove: InventoryItem | null = null;
     if (data.source === 'backpack') {
         const itemIndex = newBackpack.findIndex(i => i.instanceId === data.instanceId);
@@ -513,24 +516,33 @@ const App = (): JSX.Element => {
         itemToMove = newEquipment[data.source] ?? null;
         newEquipment[data.source] = null;
     }
+
     if (!itemToMove) return;
 
-    const movedItemDef = allItemsLookup.get(itemToMove.itemId);
-    const isTwoHanded = movedItemDef?.compatibleSlots?.includes('mainHand') && !movedItemDef.compatibleSlots.includes('offHand');
-
     // --- Pre-drop validation ---
-    if (selectedRace?.id === 'merman' && targetSlot === 'feet') return; 
+    if (selectedRace?.id === 'merman' && targetSlot === 'feet') {
+        newBackpack.push(itemToMove); // Invalid: put back
+        setBackpack(newBackpack);
+        setEquipment(newEquipment);
+        return;
+    }
 
     const mainHandItem = newEquipment.mainHand;
     if (mainHandItem) {
         const mainHandDef = allItemsLookup.get(mainHandItem.itemId);
-        const mainHandIsTwoHanded = mainHandDef?.compatibleSlots?.includes('mainHand') && !mainHandDef.compatibleSlots.includes('offHand');
+        const mainHandIsTwoHanded = mainHandDef?.properties?.twoHanded;
         if (mainHandIsTwoHanded && targetSlot === 'offHand') {
+            newBackpack.push(itemToMove); // Invalid: put back
+            setBackpack(newBackpack);
+            setEquipment(newEquipment);
             return;
         }
     }
 
     // --- Execute drop ---
+    const movedItemDef = allItemsLookup.get(itemToMove.itemId);
+    const isTwoHanded = movedItemDef?.properties?.twoHanded;
+
     if (targetSlot === 'backpack') {
         newBackpack.push(itemToMove);
     } else {
@@ -553,6 +565,57 @@ const App = (): JSX.Element => {
     setEquipment(newEquipment);
   }, [backpack, equipment, selectedRace, allItemsLookup]);
 
+  const handleItemDelete = useCallback((instanceId: string) => {
+    let itemToDeleteInstance: InventoryItem | null = null;
+    let newEquipment = { ...equipment };
+    let newBackpack = [...backpack];
+
+    // Find in equipment
+    for (const slot in newEquipment) {
+        const s = slot as EquipmentSlotId;
+        if (newEquipment[s]?.instanceId === instanceId) {
+            itemToDeleteInstance = newEquipment[s]!;
+            newEquipment[s] = null;
+            break;
+        }
+    }
+
+    // Find in backpack if not in equipment
+    if (!itemToDeleteInstance) {
+        const index = newBackpack.findIndex(i => i.instanceId === instanceId);
+        if (index > -1) {
+            itemToDeleteInstance = newBackpack[index];
+            newBackpack.splice(index, 1);
+        }
+    }
+    
+    if (!itemToDeleteInstance) return; // Not found
+
+    const itemDef = allItemsLookup.get(itemToDeleteInstance.itemId);
+
+    // If it's a default item, remove from selectedItems
+    if (itemDef && !itemDef.id.startsWith('custom-')) {
+        setSelectedItems(prev => {
+            const indexToRemove = prev.findIndex(item => item.id === itemDef.id);
+            if (indexToRemove > -1) {
+                const newSelectedItems = [...prev];
+                newSelectedItems.splice(indexToRemove, 1);
+                return newSelectedItems;
+            }
+            return prev;
+        });
+    }
+
+    // If it's a custom item, remove from the customItems master list
+    if (itemDef && itemDef.id.startsWith('custom-')) {
+        setCustomItems(prev => prev.filter(ci => ci.id !== itemDef.id));
+    }
+
+    setEquipment(newEquipment);
+    setBackpack(newBackpack);
+    
+  }, [equipment, backpack, allItemsLookup]);
+
 
   const handleCreateCustomItem = useCallback((itemData: Omit<StartingItem, 'id' | 'modificationPointCost'>) => {
       const newItem: StartingItem = {
@@ -573,9 +636,11 @@ const App = (): JSX.Element => {
 
   useEffect(() => {
     const newDerivedStats: string[] = [];
-    const dexMod = calculateModifier(finalAttributes.dexterity); 
+    const dexMod = calculateModifier(finalAttributes.dexterity);
+    const strMod = calculateModifier(finalAttributes.strength);
     const wisMod = calculateModifier(finalAttributes.wisdom);   
     const intMod = calculateModifier(finalAttributes.intelligence); 
+    const strScore = finalAttributes.strength;
 
     const allCurrentEffectiveFeats = [
         ...activeFeats, 
@@ -583,23 +648,73 @@ const App = (): JSX.Element => {
     ].filter((feat, index, self) => index === self.findIndex(f => f.id === feat.id));
 
     newDerivedStats.push(`Хитпоинты: ${currentHp} / ${maxHp}`);
-    newDerivedStats.push(`Кости Хитов: ${currentHitDice} / ${maxHitDice} (d${hitDieType})`); // Updated to use hitDieType state
-    if (exhaustionLevel >= 0) { // Always show exhaustion
+    newDerivedStats.push(`Кости Хитов: ${currentHitDice} / ${maxHitDice} (d${hitDieType})`);
+    if (exhaustionLevel >= 0) {
         newDerivedStats.push(`Уровень Истощения: ${exhaustionLevel}`);
     }
 
+    // Encumbrance and Weight
+    let totalWeight = 0;
+    const allCarriedItems: InventoryItem[] = [
+        ...Object.values(equipment).filter(Boolean) as InventoryItem[],
+        ...backpack
+    ];
+    for (const itemInstance of allCarriedItems) {
+        const itemDef = allItemsLookup.get(itemInstance.itemId);
+        if (itemDef?.weight) {
+            totalWeight += itemDef.weight;
+        }
+    }
+    totalWeight = parseFloat(totalWeight.toFixed(2));
+    
+    const carryingCapacity = strScore * 15;
+    const encumberedThreshold = strScore * 5;
+    const heavilyEncumberedThreshold = strScore * 10;
+    
+    const isEncumbered = totalWeight > encumberedThreshold && totalWeight <= heavilyEncumberedThreshold;
+    const isHeavilyEncumbered = totalWeight > heavilyEncumberedThreshold;
+
+    newDerivedStats.push(`Грузоподъемность: ${totalWeight} / ${carryingCapacity} фунтов`);
+
+    if (isHeavilyEncumbered) {
+        newDerivedStats.push(`Состояние: Сильно перегружен (Скорость -20, помеха на Силу/Ловкость/Телосложение)`);
+    } else if (isEncumbered) {
+        newDerivedStats.push(`Состояние: Перегружен (Скорость -10)`);
+    }
 
     newDerivedStats.push(`Бонус Умения: +${currentProficiencyBonus}`);
     
-    // Calculate AC from equipment
-    let acFromEquipment = 0;
-    const allItemDefs = [...AVAILABLE_STARTING_ITEMS, ...customItems];
-    const equippedArmor = equipment.armor ? allItemDefs.find(i => i.id === equipment.armor?.itemId) : null;
-    if (equippedArmor?.id === 'item_leather_armor') {
-        acFromEquipment = 1; // +1 from leather armor
+    // NEW ARMOR CLASS CALCULATION
+    let finalAC = 0;
+    const equippedArmorInstance = equipment.armor;
+    const equippedArmorDef = equippedArmorInstance ? allItemsLookup.get(equippedArmorInstance.itemId) : null;
+
+    if (equippedArmorDef && equippedArmorDef.baseArmorClass && equippedArmorDef.armorType) {
+        // Character is wearing a custom item with armor properties
+        let dexBonusForAC = 0;
+        switch (equippedArmorDef.armorType) {
+            case 'light':
+                dexBonusForAC = dexMod;
+                break;
+            case 'medium':
+                dexBonusForAC = Math.min(dexMod, 2);
+                break;
+            case 'heavy':
+                dexBonusForAC = 0;
+                break;
+        }
+        finalAC = equippedArmorDef.baseArmorClass + dexBonusForAC;
+    } else if (equippedArmorDef?.id === 'item_leather_armor') {
+        // Handle the default leather armor (equivalent to light armor with base AC 11)
+        finalAC = 11 + dexMod;
+    } else {
+        // No armor worn, or armor worn has no AC properties
+        finalAC = BASE_ARMOR_CLASS + dexMod; // Base AC 10 + dex
     }
+
+    finalAC += manualAcModifier; // Apply manual flat modifier at the end
     
-    newDerivedStats.push(`Класс Брони (КБ): ${BASE_ARMOR_CLASS + dexMod + manualAcModifier + acFromEquipment}`);
+    newDerivedStats.push(`Класс Брони (КБ): ${finalAC}`);
 
 
     SAVING_THROW_KEYS.forEach(key => {
@@ -618,7 +733,9 @@ const App = (): JSX.Element => {
     if (selectedTraits.find(t => t.id === 'trait_observant')) passivePerception += 5;
     newDerivedStats.push(`Пассивная Внимательность (концепт): ${passivePerception}`);
     
-    let speed = 30; 
+    let speed = 30;
+    if (isHeavilyEncumbered) speed -= 20;
+    else if (isEncumbered) speed -= 10;
     if (allCurrentEffectiveFeats.find(f => f.id === 'feat_mobile')) speed += 10;
     newDerivedStats.push(`Скорость (концепт): ${speed} футов`);
 
@@ -629,6 +746,64 @@ const App = (): JSX.Element => {
     if (selectedRace && selectedRace.textualEffects) {
       selectedRace.textualEffects.forEach(effect => newDerivedStats.push(effect));
     }
+
+    const formatMod = (mod: number) => mod >= 0 ? `+${mod}` : `${mod}`;
+    
+    const processWeaponForStats = (itemDef: StartingItem | null, hand: 'Осн. рука' | 'Втор. рука') => {
+        if (!itemDef || !itemDef.damageDice) return;
+
+        const isRangedWeapon = itemDef.properties?.ammunition;
+        const isThrownWeapon = itemDef.properties?.thrown;
+        const isFinesseWeapon = itemDef.properties?.finesse;
+
+        if (isRangedWeapon) {
+            newDerivedStats.push(`Атака (Дальнобойная, ${hand}): 1d20 ${formatMod(dexMod)} (Ловкость)`);
+        } else {
+            const canUseDex = isFinesseWeapon && dexMod >= strMod;
+            const meleeModValue = canUseDex ? dexMod : strMod;
+            const meleeModAttr = canUseDex ? 'Ловкость' : 'Сила';
+            newDerivedStats.push(`Атака (Рукопашная, ${hand}): 1d20 ${formatMod(meleeModValue)} (${meleeModAttr})`);
+
+            if (isThrownWeapon) {
+                // Thrown uses the same modifier as melee for that weapon
+                newDerivedStats.push(`Атака (Метание, ${hand}): 1d20 ${formatMod(meleeModValue)} (${meleeModAttr})`);
+            }
+        }
+
+        if (itemDef.damageDice) {
+            let damageString = `Урон (${itemDef.name}, ${hand}): ${itemDef.damageDice}`;
+            if (itemDef.damageType && itemDef.damageType !== 'не указан') {
+                damageString += ` ${itemDef.damageType}`;
+            }
+            newDerivedStats.push(damageString);
+        }
+        
+        if (itemDef.properties) {
+            const propertyStrings: string[] = [];
+            for (const propKey in itemDef.properties) {
+                const propDef = WEAPON_PROPERTY_DEFINITIONS.find(p => p.id === propKey);
+                if (propDef) {
+                    let propValueString = '';
+                    const propValue = (itemDef.properties as any)[propKey];
+                    if (propValue && typeof propValue !== 'boolean') {
+                        if (typeof propValue === 'object' && propValue.normal !== undefined) {
+                            propValueString = ` (${propValue.normal}/${propValue.max} фт.)`;
+                        } else {
+                            propValueString = ` (${propValue})`;
+                        }
+                    }
+                    propertyStrings.push(`${propDef.name}${propValueString}`);
+                }
+            }
+            if(propertyStrings.length > 0) {
+                newDerivedStats.push(`Свойства (${hand}): ${propertyStrings.join(', ')}`);
+            }
+        }
+    };
+
+    processWeaponForStats(equipment.mainHand ? allItemsLookup.get(equipment.mainHand.itemId) : null, 'Осн. рука');
+    processWeaponForStats(equipment.offHand ? allItemsLookup.get(equipment.offHand.itemId) : null, 'Втор. рука');
+
 
     AVAILABLE_SKILLS.forEach(skill => {
       const finalAttrScoreForSkill = finalAttributes[skill.relatedAttribute];
@@ -643,7 +818,7 @@ const App = (): JSX.Element => {
     });
 
     setDerivedStats(newDerivedStats);
-  }, [baseAttributes, finalAttributes, selectedRace, selectedTraits, selectedSkills, activeFeats, selectedFlawFeats, characterLevel, currentProficiencyBonus, currentHp, maxHp, currentHitDice, hitDieType, exhaustionLevel, conSavesProficiency, manualMaxHpModifier, manualAcModifier, equipment, customItems]);
+  }, [baseAttributes, finalAttributes, selectedRace, selectedTraits, selectedSkills, activeFeats, selectedFlawFeats, characterLevel, currentProficiencyBonus, currentHp, maxHp, currentHitDice, hitDieType, exhaustionLevel, conSavesProficiency, manualMaxHpModifier, manualAcModifier, equipment, backpack, customItems, allItemsLookup]);
 
 
   const currentCharacter: Character = {
@@ -941,7 +1116,8 @@ const App = (): JSX.Element => {
 
                     const valueFontSize = parsed.isSkill || parsed.isHpInfo ? 'text-xl' : 'text-3xl';
                     const labelFontSize = 'text-xs uppercase tracking-wider font-semibold';
-                    const containerClasses = !parsed.isNumeric && !parsed.isHpInfo ? 'col-span-2 sm:col-span-full md:col-span-full lg:col-span-full' : '';
+                    const containerClasses = parsed.isWide ? 'col-span-2 sm:col-span-full' : '';
+
 
                     return (
                       <div key={index} className={`flex flex-col items-center justify-center p-4 bg-zinc-800/70 rounded-2xl text-center h-full ${containerClasses}`}>
@@ -1061,6 +1237,7 @@ const App = (): JSX.Element => {
                 equipment={equipment}
                 backpack={backpack}
                 onItemDrop={handleItemDrop}
+                onItemDelete={handleItemDelete}
                 onCreateCustomItem={() => setIsAddItemModalOpen(true)}
             />
         </SectionPanel>

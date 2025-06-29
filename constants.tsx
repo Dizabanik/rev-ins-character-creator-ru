@@ -1,8 +1,9 @@
 
 
 
+
 import React, { CSSProperties } from 'react';
-import { DndAttribute, MadnessEffect, Trait, StartingItem, Skill, Feat, Race, ApertureGradeInfo, CharacterRankInfoNew, EssenceStageId, EssenceStageDetail, ArmorTypeForSleep, EquipmentSlotId } from './types'; // Updated CharacterRankInfoNew
+import { DndAttribute, MadnessEffect, Trait, StartingItem, Skill, Feat, Race, ApertureGradeInfo, CharacterRankInfoNew, EssenceStageId, EssenceStageDetail, ArmorTypeForSleep, EquipmentSlotId, WeaponProperties, DamageType, Rarity } from './types'; // Updated CharacterRankInfoNew
 
 export const DND_ATTRIBUTES_KEYS: DndAttribute[] = [
   'strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'
@@ -169,29 +170,29 @@ export const AVAILABLE_TRAITS: Trait[] = [
 
 export const AVAILABLE_STARTING_ITEMS: StartingItem[] = [
   // --- Basic Gear ---
-  { id: "item_dagger", name: "Простой кинжал", description: "Обычный, несколько поношенный кинжал. Колющее оружие.", modificationPointCost: 1, compatibleSlots: ['mainHand', 'offHand', 'leg_weapon_L', 'leg_weapon_R'], weight: 1 },
-  { id: "item_rations", name: "Сухой паек (1 день)", description: "Достаточно еды на один день.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'], weight: 2 },
-  { id: "item_waterskin", name: "Бутыль с водой", description: "Полная бутыль с водой.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'], weight: 5 },
-  { id: "item_torch", name: "Факел", description: "Один незажженный факел. Можно держать в руке для освещения.", modificationPointCost: 0, compatibleSlots: ['offHand'], weight: 1 },
-  { id: "item_tinderbox", name: "Трутница", description: "Используется для разведения огня.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'], weight: 1 },
-  { id: "item_rope", name: "Веревка (50 футов)", description: "Моток пеньковой веревки.", modificationPointCost: 1, compatibleSlots: [], weight: 10 },
-  { id: "item_backpack", name: "Простой рюкзак", description: "Может вместить несколько мелких предметов. Сам по себе не экипируется.", modificationPointCost: 1, compatibleSlots: [], weight: 5 },
-  { id: "item_bedroll", name: "Спальный мешок", description: "Для относительно комфортного отдыха.", modificationPointCost: 1, compatibleSlots: [], weight: 7 },
-  { id: "item_crowbar", name: "Лом", description: "Полезен для взламывания. Можно использовать как импровизированную дубину.", modificationPointCost: 2, compatibleSlots: ['mainHand'], weight: 5 },
-  { id: "item_pouch_coins", name: "Мешочек с 10 золотыми монетами", description: "Немного валюты из вашего старого мира, здесь может быть бесполезна.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'], weight: 1 },
+  { id: "item_dagger", name: "Простой кинжал", description: "Обычный, несколько поношенный кинжал.", modificationPointCost: 1, compatibleSlots: ['mainHand', 'offHand', 'leg_weapon_L', 'leg_weapon_R'], weight: 1, damageDice: '1d4', damageType: 'колющий', properties: { finesse: true, light: true, thrown: { normal: 20, max: 60 } }, rarity: 'common' },
+  { id: "item_rations", name: "Сухой паек (1 день)", description: "Достаточно еды на один день.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'], weight: 2, rarity: 'common' },
+  { id: "item_waterskin", name: "Бутыль с водой", description: "Полная бутыль с водой.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'], weight: 5, rarity: 'common' },
+  { id: "item_torch", name: "Факел", description: "Один незажженный факел. Можно держать в руке для освещения.", modificationPointCost: 0, compatibleSlots: ['offHand'], weight: 1, rarity: 'common' },
+  { id: "item_tinderbox", name: "Трутница", description: "Используется для разведения огня.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'], weight: 1, rarity: 'common' },
+  { id: "item_rope", name: "Веревка (50 футов)", description: "Моток пеньковой веревки.", modificationPointCost: 1, compatibleSlots: [], weight: 10, rarity: 'common' },
+  { id: "item_backpack", name: "Простой рюкзак", description: "Может вместить несколько мелких предметов. Сам по себе не экипируется.", modificationPointCost: 1, compatibleSlots: [], weight: 5, rarity: 'common' },
+  { id: "item_bedroll", name: "Спальный мешок", description: "Для относительно комфортного отдыха.", modificationPointCost: 1, compatibleSlots: [], weight: 7, rarity: 'common' },
+  { id: "item_crowbar", name: "Лом", description: "Полезен для взламывания. Можно использовать как импровизированную дубину.", modificationPointCost: 2, compatibleSlots: ['mainHand'], weight: 5, damageDice: '1d6', damageType: 'дробящий', rarity: 'common' },
+  { id: "item_pouch_coins", name: "Мешочек с 10 золотыми монетами", description: "Немного валюты из вашего старого мира, здесь может быть бесполезна.", modificationPointCost: 1, compatibleSlots: ['leg_pouch_L', 'leg_pouch_R'], weight: 1, rarity: 'common' },
   
   // --- Equippable Items ---
-  { id: "item_leather_armor", name: "Кожаная броня", description: "Простая броня из дубленой кожи. Дает +1 к КБ.", modificationPointCost: 2, compatibleSlots: ['armor'], weight: 10 },
-  { id: "item_simple_helmet", name: "Простой шлем", description: "Базовая защита для головы.", modificationPointCost: 1, compatibleSlots: ['head'], weight: 2 },
-  { id: "item_sturdy_boots", name: "Крепкие сапоги", description: "Защищают ноги от острых камней и пересеченной местности.", modificationPointCost: 1, compatibleSlots: ['feet'], weight: 2 },
-  { id: "item_cloth_trousers", name: "Тканевые штаны", description: "Простые, но прочные штаны.", modificationPointCost: 1, compatibleSlots: ['legs'], weight: 1 },
-  { id: "item_leather_gloves", name: "Кожаные перчатки", description: "Защищают руки и улучшают хват.", modificationPointCost: 1, compatibleSlots: ['hands_L', 'hands_R'], weight: 0.5 },
-  { id: "item_wool_cloak", name: "Шерстяной плащ", description: "Плащ, который защищает от непогоды.", modificationPointCost: 1, compatibleSlots: ['shoulder_L'], weight: 3 },
-  { id: "item_simple_bag", name: "Простая сумка", description: "Небольшая сумка через плечо для мелочей.", modificationPointCost: 1, compatibleSlots: ['shoulder_L', 'shoulder_R'], weight: 1 },
-  { id: "item_short_sword", name: "Короткий меч", description: "Надежный короткий меч. Режущее оружие.", modificationPointCost: 2, compatibleSlots: ['mainHand', 'offHand', 'leg_weapon_L', 'leg_weapon_R'], weight: 2 },
-  { id: "item_wooden_ring", name: "Деревянное кольцо", description: "Простое кольцо из дерева. Возможно, имеет сентиментальную ценность.", modificationPointCost: 0, compatibleSlots: ['ring_L1', 'ring_L2', 'ring_L3', 'ring_R1', 'ring_R2', 'ring_R3'], weight: 0 },
-  { id: "item_leather_bracelet", name: "Кожаный браслет", description: "Простой браслет из кожи.", modificationPointCost: 0, compatibleSlots: ['bracelet_L', 'bracelet_R'], weight: 0.1 },
-  { id: "item_string_amulet", name: "Амулет на веревке", description: "Простой камень, висящий на веревке.", modificationPointCost: 0, compatibleSlots: ['amulet', 'amulet2'], weight: 0.1 },
+  { id: "item_leather_armor", name: "Кожаная броня", description: "Простая броня из дубленой кожи. Дает +1 к КБ.", modificationPointCost: 2, compatibleSlots: ['armor'], weight: 10, rarity: 'common' },
+  { id: "item_simple_helmet", name: "Простой шлем", description: "Базовая защита для головы.", modificationPointCost: 1, compatibleSlots: ['head'], weight: 2, rarity: 'common' },
+  { id: "item_sturdy_boots", name: "Крепкие сапоги", description: "Защищают ноги от острых камней и пересеченной местности.", modificationPointCost: 1, compatibleSlots: ['feet'], weight: 2, rarity: 'common' },
+  { id: "item_cloth_trousers", name: "Тканевые штаны", description: "Простые, но прочные штаны.", modificationPointCost: 1, compatibleSlots: ['legs'], weight: 1, rarity: 'common' },
+  { id: "item_leather_gloves", name: "Кожаные перчатки", description: "Защищают руки и улучшают хват.", modificationPointCost: 1, compatibleSlots: ['hands_L', 'hands_R'], weight: 0.5, rarity: 'common' },
+  { id: "item_wool_cloak", name: "Шерстяной плащ", description: "Плащ, который защищает от непогоды.", modificationPointCost: 1, compatibleSlots: ['shoulder_L'], weight: 3, rarity: 'common' },
+  { id: "item_simple_bag", name: "Простая сумка", description: "Небольшая сумка через плечо для мелочей.", modificationPointCost: 1, compatibleSlots: ['shoulder_L', 'shoulder_R'], weight: 1, rarity: 'common' },
+  { id: "item_short_sword", name: "Короткий меч", description: "Надежный короткий меч. Режущее оружие.", modificationPointCost: 2, compatibleSlots: ['mainHand', 'offHand', 'leg_weapon_L', 'leg_weapon_R'], weight: 2, damageDice: '1d6', damageType: 'колющий', properties: { finesse: true, light: true }, rarity: 'common' },
+  { id: "item_wooden_ring", name: "Деревянное кольцо", description: "Простое кольцо из дерева. Возможно, имеет сентиментальную ценность.", modificationPointCost: 0, compatibleSlots: ['ring_L1', 'ring_L2', 'ring_L3', 'ring_R1', 'ring_R2', 'ring_R3'], weight: 0, rarity: 'common' },
+  { id: "item_leather_bracelet", name: "Кожаный браслет", description: "Простой браслет из кожи.", modificationPointCost: 0, compatibleSlots: ['bracelet_L', 'bracelet_R'], weight: 0.1, rarity: 'common' },
+  { id: "item_string_amulet", name: "Амулет на веревке", description: "Простой камень, висящий на веревке.", modificationPointCost: 0, compatibleSlots: ['amulet', 'amulet2'], weight: 0.1, rarity: 'common' },
 ];
 
 
@@ -598,8 +599,58 @@ export const EQUIPMENT_SLOT_NAMES_RU: Record<EquipmentSlotId, string> = {
   leg_pouch_R: 'Подсумок П',
 };
 
+// --- Weapon Constants ---
+export const DAMAGE_TYPES: DamageType[] = ['не указан', 'дробящий', 'колющий', 'рубящий'];
+
+export interface WeaponPropertyDefinition {
+    id: keyof WeaponProperties;
+    name: string;
+    hasValue?: 'string' | 'range';
+    placeholder?: string;
+    conflicts?: (keyof WeaponProperties)[];
+}
+export const WEAPON_PROPERTY_DEFINITIONS: WeaponPropertyDefinition[] = [
+    { id: 'light', name: 'Лёгкое', conflicts: ['twoHanded', 'heavy'] },
+    { id: 'finesse', name: 'Фехтовальное' },
+    { id: 'twoHanded', name: 'Двуручное', conflicts: ['light', 'versatile'] },
+    { id: 'heavy', name: 'Тяжёлое', conflicts: ['light'] },
+    { id: 'reach', name: 'Досягаемость' },
+    { id: 'loading', name: 'Перезарядка' },
+    { id: 'special', name: 'Особое' },
+    { id: 'ammunition', name: 'Боеприпас', hasValue: 'range' },
+    { id: 'versatile', name: 'Универсальное', hasValue: 'string', placeholder: '1d10', conflicts: ['twoHanded'] },
+    { id: 'thrown', name: 'Метательное', hasValue: 'range' },
+];
+
+export const RARITY_LEVELS: { id: Rarity; name: string; abbreviation: string }[] = [
+    { id: 'common', name: 'Обычный', abbreviation: 'Об' },
+    { id: 'uncommon', name: 'Необычный', abbreviation: 'Не' },
+    { id: 'rare', name: 'Редкий', abbreviation: 'Ре' },
+    { id: 'very_rare', name: 'Очень редкий', abbreviation: 'Ор' },
+    { id: 'legendary', name: 'Легендарный', abbreviation: 'Ле' },
+    { id: 'artifact', name: 'Артефакт', abbreviation: 'Ар' },
+    { id: 'varies', name: 'Качество варьируется', abbreviation: '?' },
+];
+
+export const RARITY_COLORS: Record<Rarity, { text: string; border: string; bg: string }> = {
+    common: { text: 'text-zinc-200', border: 'border-zinc-500', bg: 'bg-zinc-700/80' },
+    uncommon: { text: 'text-emerald-400', border: 'border-emerald-600', bg: 'bg-emerald-900/40' },
+    rare: { text: 'text-sky-400', border: 'border-sky-600', bg: 'bg-sky-900/40' },
+    very_rare: { text: 'text-violet-400', border: 'border-violet-600', bg: 'bg-violet-900/40' },
+    legendary: { text: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-900/40' },
+    artifact: { text: 'text-rose-500', border: 'border-rose-600', bg: 'bg-rose-900/40' },
+    varies: { text: 'text-yellow-400', border: 'border-yellow-600', bg: 'bg-yellow-900/40' },
+};
+
 
 // --- UI Icons ---
+
+export const DamageIcon: React.FC<{className?: string}> = ({ className }) => ( 
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={'w-5 h-5 ' + (className || '')}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48Z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.985 3.549A3.752 3.752 0 0012 18Z" />
+  </svg>
+);
 
 export const BackpackIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={'w-6 h-6 ' + (className || '')}>
@@ -889,6 +940,7 @@ export interface ParsedDerivedStat {
   isHpInfo?: boolean;
   isHitDieInfo?: boolean; 
   hitDieValue?: number;
+  isWide?: boolean;
 }
 
 export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => {
@@ -897,28 +949,28 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
   if (apertureMaxMatch) {
     return {
       label: "Макс. Эссенция", value: apertureMaxMatch[1], suffix: "% (" + apertureMaxMatch[2].trim() + ")",
-      IconComponent: BeakerIcon, valueColor: 'text-cyan-400', iconColor: 'text-cyan-400', isNumeric: true, isApertureInfo: true,
+      IconComponent: BeakerIcon, valueColor: 'text-cyan-400', iconColor: 'text-cyan-400', isNumeric: true, isApertureInfo: true, isWide: false
     };
   }
   const apertureRegenMatch = statString.match(/^Регенерация Эссенции:\s*(.*?)$/);
    if (apertureRegenMatch) {
     return {
       label: "Регенерация Эссенции", value: apertureRegenMatch[1].trim(), suffix: "",
-      IconComponent: BoltIcon, valueColor: 'text-emerald-400', iconColor: 'text-emerald-400', isNumeric: false, isApertureInfo: true,
+      IconComponent: BoltIcon, valueColor: 'text-emerald-400', iconColor: 'text-emerald-400', isNumeric: false, isApertureInfo: true, isWide: false
     };
   }
   const apertureTalentMatch = statString.match(/^Талант Апертуры:\s*(.+)$/);
   if (apertureTalentMatch) {
     return {
       label: "Талант Апертуры", value: apertureTalentMatch[1].trim(), suffix: "",
-      IconComponent: CircleStackIcon, valueColor: 'text-violet-400', iconColor: 'text-violet-400', isNumeric: false, isApertureInfo: true,
+      IconComponent: CircleStackIcon, valueColor: 'text-violet-400', iconColor: 'text-violet-400', isNumeric: false, isApertureInfo: true, isWide: false
     };
   }
   const apertureRankMatch = statString.match(/^Ранг Мастера Гу:\s*(.+)$/);
   if (apertureRankMatch) {
     return {
       label: "Ранг Мастера Гу", value: apertureRankMatch[1].trim(), suffix: "",
-      IconComponent: UserCircleIcon, valueColor: 'text-amber-400', iconColor: 'text-amber-400', isNumeric: false, isApertureInfo: true,
+      IconComponent: UserCircleIcon, valueColor: 'text-amber-400', iconColor: 'text-amber-400', isNumeric: false, isApertureInfo: true, isWide: false
     };
   }
   const hpMatch = statString.match(/^(Хитпоинты|HP):\s*(\d+)\s*\/\s*(\d+)\s*$/);
@@ -928,6 +980,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
         IconComponent: HeartIcon, valueColor: 'text-rose-400', iconColor: 'text-rose-500', 
         isNumeric: false, // It's a string "X / Y"
         isHpInfo: true,
+        isWide: false
     };
   }
   const hdMatch = statString.match(/^(Кости Хитов|HD):\s*(\d+)\s*\/\s*(\d+)\s*\(d(\d+)\)$/);
@@ -938,7 +991,8 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
             isNumeric: false, // It's a string "X / Y"
             isHpInfo: true,
             isHitDieInfo: true,
-            hitDieValue: parseInt(hdMatch[4])
+            hitDieValue: parseInt(hdMatch[4]),
+            isWide: false
         };
     }
   const exhaustionMatch = statString.match(/^Уровень Истощения:\s*(\d)\s*(.*)$/);
@@ -948,9 +1002,80 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
         IconComponent: ShieldExclamationIcon, valueColor: parseInt(exhaustionMatch[1]) > 0 ? 'text-amber-400' : 'text-zinc-300', iconColor: 'text-amber-500', 
         isNumeric: true, 
         isHpInfo: true,
+        isWide: false
     };
   }
 
+  const carryingCapacityMatch = statString.match(/^(Грузоподъемность):\s*(.*)$/);
+    if (carryingCapacityMatch) {
+        return {
+            label: carryingCapacityMatch[1].trim(),
+            value: carryingCapacityMatch[2].trim(),
+            suffix: "",
+            IconComponent: ScaleIcon,
+            valueColor: 'text-orange-400',
+            iconColor: 'text-orange-400',
+            isNumeric: false,
+            isWide: true,
+        };
+    }
+
+  const statusMatch = statString.match(/^(Состояние):\s*(.*)$/);
+    if (statusMatch) {
+        const isHeavy = statusMatch[2].includes('Сильно');
+        return {
+            label: statusMatch[1].trim(),
+            value: statusMatch[2].trim(),
+            suffix: "",
+            IconComponent: ShieldExclamationIcon,
+            valueColor: isHeavy ? 'text-rose-500' : 'text-amber-400',
+            iconColor: isHeavy ? 'text-rose-500' : 'text-amber-400',
+            isNumeric: false,
+            isWide: true,
+        };
+    }
+
+  const attackMatch = statString.match(/^(Атака \(.*\)):\s*(.*)$/);
+  if (attackMatch) {
+    return {
+      label: attackMatch[1].trim(),
+      value: attackMatch[2].trim(),
+      suffix: "",
+      IconComponent: DamageIcon, 
+      valueColor: 'text-amber-400',
+      iconColor: 'text-amber-400',
+      isNumeric: false,
+      isWide: true,
+    };
+  }
+
+  const propertyMatch = statString.match(/^(Свойства \(.*\)):\s*(.*)$/);
+    if (propertyMatch) {
+      return {
+          label: propertyMatch[1].trim(),
+          value: propertyMatch[2].trim(),
+          suffix: "",
+          IconComponent: StarIcon, 
+          valueColor: 'text-teal-300',
+          iconColor: 'text-teal-400',
+          isNumeric: false,
+          isWide: true
+      };
+  }
+
+  const damageMatch = statString.match(/^(Урон \(.*\)):\s*(.*)$/);
+  if (damageMatch) {
+    return {
+      label: damageMatch[1].trim(),
+      value: damageMatch[2].trim(),
+      suffix: "",
+      IconComponent: DamageIcon,
+      valueColor: 'text-orange-400',
+      iconColor: 'text-orange-400',
+      isNumeric: false,
+      isWide: true,
+    };
+  }
 
   const skillMatch = statString.match(/^Навык:\s*(.*?):\s*([+-]?\d+)\s*(.*)$/);
   if (skillMatch) {
@@ -963,6 +1088,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
       iconColor: 'text-teal-400',   
       isNumeric: true,
       isSkill: true,
+      isWide: false
     };
   }
 
@@ -1002,7 +1128,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
     } else if (label.startsWith("Бонус Умения")) {
       IconComponent = StarIcon; valueColor = "text-amber-300"; iconColor = "text-amber-400";
     }
-    return { label, value, suffix, IconComponent, valueColor, iconColor, isNumeric: true, isSkill: false };
+    return { label, value, suffix, IconComponent, valueColor, iconColor, isNumeric: true, isSkill: false, isWide: false };
   }
 
   const textualMatch = statString.match(/^(.*?):\s*(.+)$/);
@@ -1020,6 +1146,7 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
       iconColor: icoColor,    
       isNumeric: false,
       isSkill: false,
+      isWide: true
     };
   }
   
@@ -1032,5 +1159,6 @@ export const parseDerivedStatValue = (statString: string): ParsedDerivedStat => 
     iconColor: 'text-sky-400',
     isNumeric: false,
     isSkill: false,
+    isWide: true
   };
 };
