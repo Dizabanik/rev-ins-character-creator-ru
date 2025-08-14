@@ -43,16 +43,59 @@ const calculateFinalAttributes = (baseAttributes: Attributes, race?: Race): Attr
   return finalAttributes;
 };
 
+// const getTopAttributeKeysForSkillSelection = (finalAttributes: Attributes): DndAttribute[] => {
+//   const scores = DND_ATTRIBUTES_KEYS
+//     .map(key => ({ key, score: finalAttributes[key] as number }))
+//     .sort((a, b) => b.score - a.score);
+
+//   if (scores.length === 0) return [];
+//   const cutoffScore = scores[Math.min(1, scores.length - 1)].score;
+//   return scores
+//     .filter(s => s.score >= cutoffScore)
+//     .map(s => s.key);
+// };
 const getTopAttributeKeysForSkillSelection = (finalAttributes: Attributes): DndAttribute[] => {
   const scores = DND_ATTRIBUTES_KEYS
     .map(key => ({ key, score: finalAttributes[key] as number }))
     .sort((a, b) => b.score - a.score);
 
   if (scores.length === 0) return [];
+
   const cutoffScore = scores[Math.min(1, scores.length - 1)].score;
-  return scores
+  const topKeys = scores
     .filter(s => s.score >= cutoffScore)
     .map(s => s.key);
+
+  // If exactly two attributes were selected and one is "constitution",
+  // replace constitution with the next best non-constitution attribute(s),
+  // including any ties at that replacement score.
+  if (topKeys.length === 2 && topKeys.includes('constitution' as DndAttribute)) {
+    const replacement: DndAttribute[] = [];
+    // iterate sorted scores, skipping "constitution"
+    for (let i = 0; i < scores.length; i++) {
+      const entry = scores[i];
+      if (entry.key === ('constitution' as DndAttribute)) continue;
+
+      replacement.push(entry.key);
+
+      // once we've collected at least 2, include any further ties at the same score
+      if (replacement.length >= 2) {
+        const lastScore = entry.score;
+        // include subsequent non-constitution entries with the same score
+        for (let j = i + 1; j < scores.length; j++) {
+          if (scores[j].key === ('constitution' as DndAttribute)) continue;
+          if (scores[j].score === lastScore) replacement.push(scores[j].key);
+          else break;
+        }
+        break;
+      }
+    }
+    // If there weren't enough non-constitution attributes to reach 2,
+    // replacement will contain whatever non-constitution attributes exist.
+    return replacement;
+  }
+
+  return topKeys;
 };
 
 const arraysHaveSameElements = (arr1: DndAttribute[], arr2: DndAttribute[]): boolean => {
