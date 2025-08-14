@@ -74,7 +74,7 @@ const getTopAttributeKeysForSkillSelection = (finalAttributes: Attributes): DndA
     // iterate sorted scores, skipping "constitution"
     for (let i = 0; i < scores.length; i++) {
       const entry = scores[i];
-      if (entry.key === ('constitution' as DndAttribute)) continue;
+      // if (entry.key === ('constitution' as DndAttribute)) continue;
 
       replacement.push(entry.key);
 
