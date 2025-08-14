@@ -69,12 +69,16 @@ const getTopAttributeKeysForSkillSelection = (finalAttributes: Attributes): DndA
   // If exactly two attributes were selected and one is "constitution",
   // replace constitution with the next best non-constitution attribute(s),
   // including any ties at that replacement score.
+  let incLater = false;
   if (topKeys.length === 2 && topKeys.includes('constitution' as DndAttribute)) {
     const replacement: DndAttribute[] = [];
     // iterate sorted scores, skipping "constitution"
     for (let i = 0; i < scores.length; i++) {
       const entry = scores[i];
-      // if (entry.key === ('constitution' as DndAttribute)) continue;
+      if (entry.key === ('constitution' as DndAttribute)){
+        incLater = true;
+        continue;
+      }
 
       replacement.push(entry.key);
 
@@ -89,6 +93,9 @@ const getTopAttributeKeysForSkillSelection = (finalAttributes: Attributes): DndA
         }
         break;
       }
+    }
+    if(incLater == true){
+      replacement.push('constitution' as DndAttribute); // add "constitution" back in at the end
     }
     // If there weren't enough non-constitution attributes to reach 2,
     // replacement will contain whatever non-constitution attributes exist.
